@@ -1,0 +1,40 @@
+keystore.properties
+*.jks
+*.keystore
+local.properties
+
+# Local Android/Gradle configuration
+local.properties
+.gradle/
+.kotlin/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# IDE/editor files
+.idea/
+*.iml
+.vscode/
+
+# Generated release artifacts
+*.apk
+*.aab
+*.ap_
+*.idsig
+output-metadata.json
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Project-local private/reference files
+Logo.png
+docs
+sprints
