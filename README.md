@@ -133,6 +133,4 @@ USB tethering mode uses Android USB tethering as an IP network link. It is not U
 - Network discovery is intended for receiver setup and stream detection.
 - Release artifacts, local SDK config, build outputs, and signing files are excluded from Git through `.gitignore`.
 
-## License
 
-No license has been specified yet.
