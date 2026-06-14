@@ -30,8 +30,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "audiolan.db",
         )
-            .addMigrations(MIGRATION_1_2)
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
 
     @Provides
@@ -54,5 +53,16 @@ private object MIGRATION_1_2 : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE streams ADD COLUMN transport_mode TEXT NOT NULL DEFAULT 'WIFI'")
         db.execSQL("ALTER TABLE streams ADD COLUMN low_latency INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+object MIGRATION_2_3 : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE streams ADD COLUMN source_type TEXT NOT NULL DEFAULT 'MIC'")
+        db.execSQL("ALTER TABLE streams ADD COLUMN broadcast_mode INTEGER NOT NULL DEFAULT 0")
+        db.execSQL(
+            "UPDATE streams SET service_type = 'TRANSMITTER' " +
+                "WHERE service_type = 'MIC' OR service_type = 'CAST'",
+        )
     }
 }

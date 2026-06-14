@@ -3,6 +3,10 @@ package com.audiolan.app.service.base
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.IBinder
 import android.os.PowerManager
 import com.audiolan.app.domain.model.ServiceState
@@ -11,8 +15,10 @@ import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.domain.model.StreamError
 import com.audiolan.app.domain.model.TransportMode
 import com.audiolan.app.service.ServiceEntryPoint
+import com.audiolan.app.util.NetworkUtils
 import com.audiolan.app.util.RetryUtils
 import dagger.hilt.android.EntryPointAccessors
+import java.net.DatagramSocket
 import java.net.SocketException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -27,6 +34,9 @@ abstract class BaseStreamingService : Service() {
     protected val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     protected val runningJobs = mutableMapOf<Long, Job>()
     private var wakeLock: PowerManager.WakeLock? = null
+    @Volatile
+    protected var currentWifiNetwork: Network? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     protected val entryPoint by lazy {
         EntryPointAccessors.fromApplication(applicationContext, ServiceEntryPoint::class.java)
@@ -54,7 +64,7 @@ abstract class BaseStreamingService : Service() {
                 (newIds - currentIds).forEach { id ->
                     val stream = enabledStreams.first { it.id == id }
                     Timber.d("Starting stream coroutine id=$id name=${stream.name}")
-                    runningJobs[id] = serviceScope.launch { retryLoop(stream) }
+                    runningJobs[id] = launchStreamJob(stream)
                     changed = true
                 }
 
@@ -62,6 +72,91 @@ abstract class BaseStreamingService : Service() {
                     updateStreamCountNotification()
                 }
             }
+        }
+    }
+
+    protected fun registerWifiNetworkCallback() {
+        if (networkCallback != null) return
+
+        val connectivityManager = getSystemService(ConnectivityManager::class.java) ?: return
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                currentWifiNetwork = network
+                Timber.d("${this@BaseStreamingService::class.java.simpleName}: Wi-Fi network available, rebinding sockets")
+                onWifiNetworkAvailable(network)
+            }
+
+            override fun onLost(network: Network) {
+                if (currentWifiNetwork == network) {
+                    currentWifiNetwork = null
+                    Timber.w("${this@BaseStreamingService::class.java.simpleName}: Wi-Fi connection lost")
+                    onWifiNetworkLost()
+                }
+            }
+        }
+
+        runCatching {
+            connectivityManager.requestNetwork(request, callback)
+            networkCallback = callback
+        }.onFailure { throwable ->
+            Timber.w(throwable, "Unable to request Wi-Fi network callback")
+        }
+
+        NetworkUtils.getWifiNetwork(applicationContext)?.let { currentWifiNetwork = it }
+    }
+
+    protected open fun onWifiNetworkAvailable(network: Network) {
+        rebindSocketsToNetwork(network)
+    }
+
+    protected open fun onWifiNetworkLost() {
+        serviceScope.launch {
+            runningJobs.values.forEach { it.cancel() }
+            runningJobs.clear()
+            updateServiceState(ServiceState.Error("Wi-Fi connection lost"))
+            updateStreamCountNotification()
+            stopSelf()
+        }
+    }
+
+    protected fun rebindSocketsToNetwork(network: Network) {
+        serviceScope.launch {
+            val activeIds = runningJobs.keys.toSet()
+            if (activeIds.isEmpty()) return@launch
+
+            val streams = streamRepository.getStreamsByType(serviceType()).first()
+                .filter { it.isEnabled && it.id in activeIds }
+
+            runningJobs.values.forEach { it.cancel() }
+            runningJobs.clear()
+
+            streams.forEach { stream ->
+                Timber.d(
+                    "${this@BaseStreamingService::class.java.simpleName}: restarting stream ${stream.name} on Wi-Fi network $network",
+                )
+                runningJobs[stream.id] = launchStreamJob(stream)
+            }
+            updateStreamCountNotification()
+        }
+    }
+
+    protected fun bindSocketToWifiNetwork(socket: DatagramSocket, stream: Stream? = null) {
+        val network = currentWifiNetwork ?: NetworkUtils.getWifiNetwork(applicationContext)
+        if (network == null) {
+            Timber.w("No Wi-Fi network available for socket bind${stream?.let { " (${it.name})" } ?: ""}")
+            return
+        }
+
+        runCatching {
+            network.bindSocket(socket)
+            currentWifiNetwork = network
+            Timber.d("Bound UDP socket to Wi-Fi network $network${stream?.let { " for ${it.name}" } ?: ""}")
+        }.onFailure { throwable ->
+            Timber.w(throwable, "Failed to bind UDP socket to Wi-Fi network")
         }
     }
 
@@ -82,6 +177,9 @@ abstract class BaseStreamingService : Service() {
         }
         wakeLock = null
     }
+
+    private fun launchStreamJob(stream: Stream): Job =
+        serviceScope.launch { retryLoop(stream) }
 
     private suspend fun retryLoop(stream: Stream) {
         val maxAttempts = 3
@@ -117,14 +215,29 @@ abstract class BaseStreamingService : Service() {
 
     protected open fun postStreamError(stream: Stream, message: String) {
         Timber.e("Stream error: ${stream.name} - $message")
+        updateServiceState(ServiceState.Error(message))
+    }
+
+    protected fun updateServiceState(state: ServiceState) {
         when (serviceType()) {
-            ServiceType.MIC -> serviceManager.updateMicState(ServiceState.Error(message))
-            ServiceType.CAST -> serviceManager.updateCastState(ServiceState.Error(message))
-            ServiceType.RECEIVER -> serviceManager.updateReceiverState(ServiceState.Error(message))
+            ServiceType.TRANSMITTER -> serviceManager.updateTransmitterState(state)
+            ServiceType.RECEIVER -> serviceManager.updateReceiverState(state)
         }
     }
 
+    private fun unregisterWifiNetworkCallback() {
+        val callback = networkCallback ?: return
+        runCatching {
+            getSystemService(ConnectivityManager::class.java)
+                ?.unregisterNetworkCallback(callback)
+        }.onFailure { throwable ->
+            Timber.w(throwable, "Failed to unregister Wi-Fi network callback")
+        }
+        networkCallback = null
+    }
+
     override fun onDestroy() {
+        unregisterWifiNetworkCallback()
         serviceScope.cancel()
         onServiceDestroyed()
         super.onDestroy()

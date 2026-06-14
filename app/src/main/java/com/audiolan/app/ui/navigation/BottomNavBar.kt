@@ -4,11 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,7 +23,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import com.audiolan.app.ui.theme.AppBackground
 import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
 import com.audiolan.app.ui.theme.TextSecondary
@@ -39,8 +37,7 @@ private data class BottomNavItem(
 
 private val bottomNavItems = listOf(
     BottomNavItem(Screen.Home.route, Icons.Default.Home, "home"),
-    BottomNavItem(Screen.Mic.route, Icons.Default.Mic, "mic"),
-    BottomNavItem(Screen.Cast.route, Icons.Default.Cast, "cast"),
+    BottomNavItem(Screen.Transmitter.route, Icons.Default.SettingsVoice, "transmitter"),
     BottomNavItem(Screen.Receiver.route, Icons.Default.CellTower, "receiver"),
     BottomNavItem(Screen.Settings.route, Icons.Default.Settings, "settings"),
 )
@@ -60,7 +57,7 @@ fun BottomNavBar(
                 .navigationBarsPadding()
                 .height(Dimensions.BottomNavHeight)
                 .testTag("bottom_navigation"),
-            containerColor = AppBackground,
+            containerColor = MaterialTheme.colorScheme.background,
         ) {
             bottomNavItems.forEach { item ->
                 val selected = currentRoute == item.route

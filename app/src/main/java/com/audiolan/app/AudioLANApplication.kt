@@ -28,13 +28,8 @@ class AudioLANApplication : Application() {
         val notificationManager = getSystemService<NotificationManager>() ?: return
         val channels = listOf(
             NotificationChannel(
-                ServiceManager.MIC_CHANNEL_ID,
-                getString(R.string.notification_mic_service_title),
-                NotificationManager.IMPORTANCE_LOW,
-            ),
-            NotificationChannel(
-                ServiceManager.CAST_CHANNEL_ID,
-                getString(R.string.notification_cast_service_title),
+                ServiceManager.TRANSMITTER_CHANNEL_ID,
+                getString(R.string.notification_transmitter_service_title),
                 NotificationManager.IMPORTANCE_LOW,
             ),
             NotificationChannel(

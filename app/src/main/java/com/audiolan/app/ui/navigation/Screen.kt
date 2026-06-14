@@ -4,8 +4,7 @@ import android.net.Uri
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
-    data object Mic : Screen("mic")
-    data object Cast : Screen("cast")
+    data object Transmitter : Screen("transmitter")
     data object Receiver : Screen("receiver")
     data object Settings : Screen("settings")
     data object Discovery : Screen("discovery")
@@ -34,7 +33,6 @@ sealed class Screen(val route: String) {
         fun createRoute(): String = createRoute(streamId = -1L)
     }
 
-    data object MicSettings : Screen("settings/mic")
-    data object CastSettings : Screen("settings/cast")
+    data object TransmitterSettings : Screen("settings/transmitter")
     data object ReceiverSettings : Screen("settings/receiver")
 }

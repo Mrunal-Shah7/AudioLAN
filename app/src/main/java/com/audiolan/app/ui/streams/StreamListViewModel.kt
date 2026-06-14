@@ -5,8 +5,11 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.audiolan.app.data.repository.StreamRepository
+import com.audiolan.app.domain.model.ServiceState
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.Stream
+import com.audiolan.app.service.ServiceManager
+import com.audiolan.app.ui.components.StreamStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -34,6 +38,7 @@ data class StreamListUiState(
 @HiltViewModel
 class StreamListViewModel @Inject constructor(
     private val streamRepository: StreamRepository,
+    private val serviceManager: ServiceManager,
 ) : ViewModel() {
     private val serviceType = MutableStateFlow<ServiceType?>(null)
     val snackbarHostState = SnackbarHostState()
@@ -58,11 +63,61 @@ class StreamListViewModel @Inject constructor(
             initialValue = StreamListUiState(isLoading = true),
         )
 
+    val serviceState: StateFlow<ServiceState> = serviceType
+        .flatMapLatest { type ->
+            when (type) {
+                ServiceType.TRANSMITTER -> serviceManager.transmitterState
+                ServiceType.RECEIVER -> serviceManager.receiverState
+                null -> flowOf(ServiceState.Idle)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ServiceState.Idle)
+
+    val levelState: StateFlow<Pair<Float, Float>> = serviceType
+        .flatMapLatest { type ->
+            when (type) {
+                ServiceType.TRANSMITTER -> serviceManager.transmitterLevel
+                ServiceType.RECEIVER -> serviceManager.receiverLevel
+                null -> flowOf(0f to 0f)
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0f to 0f)
+
+    private val activeDelayElapsed = MutableStateFlow(false)
+
+    val streamStatuses: StateFlow<Map<Long, StreamStatus>> =
+        combine(uiState, serviceState, activeDelayElapsed) { uiState, state, delayElapsed ->
+            when {
+                state is ServiceState.Error -> uiState.streams
+                    .filter { it.isEnabled }
+                    .associate { it.id to StreamStatus.Error(state.message) }
+                state is ServiceState.Running -> uiState.streams
+                    .filter { it.isEnabled }
+                    .associate { stream ->
+                        stream.id to if (delayElapsed) StreamStatus.Active else StreamStatus.Connecting
+                    }
+                else -> emptyMap()
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
     init {
         viewModelScope.launch {
             volumeUpdates
                 .debounce(300L)
                 .collect { (id, volume) -> streamRepository.setVolume(id, volume) }
+        }
+        viewModelScope.launch {
+            serviceState.collect { state ->
+                if (state is ServiceState.Running) {
+                    activeDelayElapsed.value = false
+                    kotlinx.coroutines.delay(ACTIVE_STATUS_DELAY_MS)
+                    if (serviceState.value is ServiceState.Running) {
+                        activeDelayElapsed.value = true
+                    }
+                } else {
+                    activeDelayElapsed.value = false
+                }
+            }
         }
     }
 
@@ -93,5 +148,9 @@ class StreamListViewModel @Inject constructor(
                 duration = SnackbarDuration.Long,
             )
         }
+    }
+
+    private companion object {
+        const val ACTIVE_STATUS_DELAY_MS = 2_000L
     }
 }

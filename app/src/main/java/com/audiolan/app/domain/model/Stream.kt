@@ -9,6 +9,8 @@ data class Stream(
     val netQuality: NetQuality,
     val transportMode: TransportMode = TransportMode.WIFI,
     val lowLatency: Boolean = false,
+    val sourceType: SourceType = SourceType.MIC,
+    val broadcastMode: Boolean = false,
     val volume: Float,
     val isEnabled: Boolean,
 )

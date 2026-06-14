@@ -99,7 +99,10 @@ class DiscoveryService : Service() {
             return null
         }
         return try {
-            DatagramSocket(VBAN_PORT).apply { soTimeout = SOCKET_TIMEOUT_MS }
+            DatagramSocket(VBAN_PORT).apply {
+                soTimeout = SOCKET_TIMEOUT_MS
+                bindToWifiNetwork(this)
+            }
         } catch (e: BindException) {
             Timber.w(e, "Discovery: could not bind port $VBAN_PORT - passive sniffing disabled")
             null
@@ -111,11 +114,22 @@ class DiscoveryService : Service() {
             DatagramSocket(PING_PONG_PORT).apply {
                 soTimeout = SOCKET_TIMEOUT_MS
                 broadcast = true
+                bindToWifiNetwork(this)
             }
         } catch (e: BindException) {
             Timber.w(e, "Discovery: could not bind port $PING_PONG_PORT - ping/pong disabled")
             null
         }
+
+    private fun bindToWifiNetwork(socket: DatagramSocket) {
+        val network = NetworkUtils.getWifiNetwork(applicationContext) ?: return
+        runCatching {
+            network.bindSocket(socket)
+            Timber.d("Discovery: bound socket to Wi-Fi network $network")
+        }.onFailure { error ->
+            Timber.w(error, "Discovery: failed to bind socket to Wi-Fi network")
+        }
+    }
 
     private fun emitUsbTetherCandidates() {
         NetworkUtils.getUsbTetherPeerCandidates().forEach { ip ->

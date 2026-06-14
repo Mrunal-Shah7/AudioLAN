@@ -31,6 +31,7 @@ fun DetailRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     errorMessage: String? = null,
+    readOnly: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -38,6 +39,7 @@ fun DetailRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(
+                enabled = !readOnly,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,

@@ -2,9 +2,8 @@ package com.audiolan.app.data.repository
 
 import com.audiolan.app.data.local.preferences.SettingsDataStore
 import com.audiolan.app.domain.model.AccentColor
-import com.audiolan.app.domain.model.CastSettings
-import com.audiolan.app.domain.model.MicSettings
 import com.audiolan.app.domain.model.ReceiverSettings
+import com.audiolan.app.domain.model.TransmitterSettings
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -12,11 +11,9 @@ import kotlinx.coroutines.flow.Flow
 interface SettingsRepository {
     fun getAccentColor(): Flow<AccentColor>
     fun getAmoledMode(): Flow<Boolean>
-    fun getMicSettings(): Flow<MicSettings>
-    fun getCastSettings(): Flow<CastSettings>
+    fun getTransmitterSettings(): Flow<TransmitterSettings>
     fun getReceiverSettings(): Flow<ReceiverSettings>
-    suspend fun saveMicSettings(settings: MicSettings)
-    suspend fun saveCastSettings(settings: CastSettings)
+    suspend fun saveTransmitterSettings(settings: TransmitterSettings)
     suspend fun saveReceiverSettings(settings: ReceiverSettings)
     suspend fun saveAccentColor(color: AccentColor)
     suspend fun saveAmoledMode(enabled: Boolean)
@@ -30,18 +27,12 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override fun getAmoledMode(): Flow<Boolean> = settingsDataStore.amoledMode
 
-    override fun getMicSettings(): Flow<MicSettings> = settingsDataStore.micSettings
-
-    override fun getCastSettings(): Flow<CastSettings> = settingsDataStore.castSettings
+    override fun getTransmitterSettings(): Flow<TransmitterSettings> = settingsDataStore.transmitterSettings
 
     override fun getReceiverSettings(): Flow<ReceiverSettings> = settingsDataStore.receiverSettings
 
-    override suspend fun saveMicSettings(settings: MicSettings) {
-        settingsDataStore.saveMicSettings(settings)
-    }
-
-    override suspend fun saveCastSettings(settings: CastSettings) {
-        settingsDataStore.saveCastSettings(settings)
+    override suspend fun saveTransmitterSettings(settings: TransmitterSettings) {
+        settingsDataStore.saveTransmitterSettings(settings)
     }
 
     override suspend fun saveReceiverSettings(settings: ReceiverSettings) {

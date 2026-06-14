@@ -3,9 +3,8 @@ package com.audiolan.app.data.repository
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.audiolan.app.data.local.preferences.SettingsDataStore
 import com.audiolan.app.domain.model.AccentColor
-import com.audiolan.app.domain.model.CastSettings
-import com.audiolan.app.domain.model.MicSettings
 import com.audiolan.app.domain.model.ReceiverSettings
+import com.audiolan.app.domain.model.TransmitterSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
@@ -44,12 +43,11 @@ class SettingsRepositoryTest {
 
     @Test
     fun defaultValuesAreEmittedBeforeSave() = runTest {
-        val micSettings = repository.getMicSettings().first()
+        val transmitterSettings = repository.getTransmitterSettings().first()
 
-        assertEquals(MicSettings(), micSettings)
+        assertEquals(TransmitterSettings(), transmitterSettings)
         assertEquals(AccentColor.LAVENDER, repository.getAccentColor().first())
         assertEquals(false, repository.getAmoledMode().first())
-        assertEquals(CastSettings(), repository.getCastSettings().first())
         assertEquals(ReceiverSettings(), repository.getReceiverSettings().first())
     }
 
@@ -68,8 +66,8 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun saveAndRetrieveMicSettings() = runTest {
-        val settings = MicSettings(
+    fun saveAndRetrieveTransmitterSettings() = runTest {
+        val settings = TransmitterSettings(
             audioSource = "VOICE_COMM",
             inputChannel = "MONO",
             sampleRate = 44100,
@@ -78,23 +76,9 @@ class SettingsRepositoryTest {
             globalVolume = 0.5f,
         )
 
-        repository.saveMicSettings(settings)
+        repository.saveTransmitterSettings(settings)
 
-        assertEquals(settings, repository.getMicSettings().first())
-    }
-
-    @Test
-    fun saveAndRetrieveCastSettings() = runTest {
-        val settings = CastSettings(
-            channelOut = "MONO",
-            sampleRate = 44100,
-            encoding = 16,
-            bufferSize = 480,
-        )
-
-        repository.saveCastSettings(settings)
-
-        assertEquals(settings, repository.getCastSettings().first())
+        assertEquals(settings, repository.getTransmitterSettings().first())
     }
 
     @Test
@@ -107,8 +91,8 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun savingCopiedMicSettingsRetainsOtherSavedFields() = runTest {
-        val initial = MicSettings(
+    fun savingCopiedTransmitterSettingsRetainsOtherSavedFields() = runTest {
+        val initial = TransmitterSettings(
             audioSource = "VOICE_COMM",
             inputChannel = "MONO",
             sampleRate = 44100,
@@ -116,10 +100,10 @@ class SettingsRepositoryTest {
             bufferSize = 480,
             globalVolume = 0.5f,
         )
-        repository.saveMicSettings(initial)
+        repository.saveTransmitterSettings(initial)
 
-        repository.saveMicSettings(initial.copy(globalVolume = 1.7f))
-        val result = repository.getMicSettings().first()
+        repository.saveTransmitterSettings(initial.copy(globalVolume = 1.7f))
+        val result = repository.getTransmitterSettings().first()
 
         assertEquals("VOICE_COMM", result.audioSource)
         assertEquals("MONO", result.inputChannel)

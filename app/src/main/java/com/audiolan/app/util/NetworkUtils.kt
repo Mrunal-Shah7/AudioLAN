@@ -1,7 +1,12 @@
 package com.audiolan.app.util
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import java.io.File
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.NetworkInterface
 
 object NetworkUtils {
@@ -55,4 +60,36 @@ object NetworkUtils {
             lower.startsWith("usb") ||
             lower.startsWith("eth")
     }
+
+    fun getWifiBroadcastAddress(): InetAddress? {
+        val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: return null
+        return interfaces
+            .asSequence()
+            .filter { it.isUp && !it.isLoopback && isLikelyWifiInterface(it.name) }
+            .flatMap { it.interfaceAddresses.asSequence() }
+            .mapNotNull { it.broadcast }
+            .firstOrNull()
+    }
+
+    fun getWifiNetwork(context: Context): Network? {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java) ?: return null
+        val activeNetwork = connectivityManager.activeNetwork
+        if (activeNetwork != null && connectivityManager.isWifiNetwork(activeNetwork)) {
+            return activeNetwork
+        }
+        return connectivityManager.allNetworks.firstOrNull { network ->
+            connectivityManager.isWifiNetwork(network)
+        }
+    }
+
+    fun isLikelyWifiInterface(interfaceName: String): Boolean {
+        val lower = interfaceName.lowercase()
+        return lower.startsWith("wlan") ||
+            lower.startsWith("wifi") ||
+            lower.startsWith("eth")
+    }
+
+    private fun ConnectivityManager.isWifiNetwork(network: Network): Boolean =
+        getNetworkCapabilities(network)
+            ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
 }

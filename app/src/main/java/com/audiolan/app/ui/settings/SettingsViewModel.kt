@@ -4,9 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.audiolan.app.data.repository.SettingsRepository
 import com.audiolan.app.domain.model.AccentColor
-import com.audiolan.app.domain.model.CastSettings
-import com.audiolan.app.domain.model.MicSettings
 import com.audiolan.app.domain.model.ReceiverSettings
+import com.audiolan.app.domain.model.TransmitterSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,65 +23,44 @@ class SettingsViewModel @Inject constructor(
     val amoledMode: StateFlow<Boolean> = settingsRepository.getAmoledMode()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    val micSettings: StateFlow<MicSettings> = settingsRepository.getMicSettings()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MicSettings())
-
-    val castSettings: StateFlow<CastSettings> = settingsRepository.getCastSettings()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CastSettings())
+    val transmitterSettings: StateFlow<TransmitterSettings> = settingsRepository.getTransmitterSettings()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TransmitterSettings())
 
     val receiverSettings: StateFlow<ReceiverSettings> = settingsRepository.getReceiverSettings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReceiverSettings())
 
-    fun setMicAudioSource(value: String) {
+    fun setTransmitterAudioSource(value: String) {
         viewModelScope.launch {
-            settingsRepository.saveMicSettings(micSettings.value.copy(audioSource = value))
+            settingsRepository.saveTransmitterSettings(transmitterSettings.value.copy(audioSource = value))
         }
     }
 
-    fun setMicInputChannel(value: String) {
+    fun setTransmitterInputChannel(value: String) {
         viewModelScope.launch {
-            settingsRepository.saveMicSettings(micSettings.value.copy(inputChannel = value))
+            settingsRepository.saveTransmitterSettings(transmitterSettings.value.copy(inputChannel = value))
         }
     }
 
-    fun setMicSampleRate(value: Int) {
+    fun setTransmitterSampleRate(value: Int) {
         viewModelScope.launch {
-            settingsRepository.saveMicSettings(micSettings.value.copy(sampleRate = value))
+            settingsRepository.saveTransmitterSettings(transmitterSettings.value.copy(sampleRate = value))
         }
     }
 
-    fun setMicBufferSize(value: Int) {
+    fun setTransmitterBufferSize(value: Int) {
         viewModelScope.launch {
-            settingsRepository.saveMicSettings(micSettings.value.copy(bufferSize = value))
+            settingsRepository.saveTransmitterSettings(transmitterSettings.value.copy(bufferSize = value))
         }
     }
 
-    fun setMicGlobalVolume(value: Float) {
+    fun setTransmitterGlobalVolume(value: Float) {
         viewModelScope.launch {
-            settingsRepository.saveMicSettings(micSettings.value.copy(globalVolume = value))
+            settingsRepository.saveTransmitterSettings(transmitterSettings.value.copy(globalVolume = value))
         }
     }
 
-    fun resetMicGlobalVolume() {
-        setMicGlobalVolume(1.0f)
-    }
-
-    fun setCastChannelOut(value: String) {
-        viewModelScope.launch {
-            settingsRepository.saveCastSettings(castSettings.value.copy(channelOut = value))
-        }
-    }
-
-    fun setCastSampleRate(value: Int) {
-        viewModelScope.launch {
-            settingsRepository.saveCastSettings(castSettings.value.copy(sampleRate = value))
-        }
-    }
-
-    fun setCastBufferSize(value: Int) {
-        viewModelScope.launch {
-            settingsRepository.saveCastSettings(castSettings.value.copy(bufferSize = value))
-        }
+    fun resetTransmitterGlobalVolume() {
+        setTransmitterGlobalVolume(1.0f)
     }
 
     fun setReceiverGlobalVolume(value: Float) {

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +45,7 @@ fun ReceiverSettingsScreen(
     navController: NavController,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val settings by viewModel.receiverSettings.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -67,7 +69,11 @@ fun ReceiverSettingsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { innerPadding ->
@@ -75,6 +81,7 @@ fun ReceiverSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = innerPadding.calculateTopPadding())
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .navigationBarsPadding()
                 .padding(horizontal = Dimensions.ScreenHorizontalPadding)
                 .verticalScroll(rememberScrollState())

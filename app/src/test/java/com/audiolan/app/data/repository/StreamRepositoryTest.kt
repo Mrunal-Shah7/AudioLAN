@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.audiolan.app.data.local.db.AppDatabase
 import com.audiolan.app.domain.model.NetQuality
 import com.audiolan.app.domain.model.ServiceType
+import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.domain.model.TransportMode
 import kotlinx.coroutines.channels.Channel
@@ -43,29 +44,31 @@ class StreamRepositoryTest {
 
     @Test
     fun insertAndRetrieveReturnsInsertedStream() = runTest {
-        val stream = stream(serviceType = ServiceType.MIC, name = "Mic One")
+        val stream = stream(serviceType = ServiceType.TRANSMITTER, name = "Mic One")
 
         val id = repository.insertOrUpdate(stream)
-        val result = repository.getStreamsByType(ServiceType.MIC).first().single()
+        val result = repository.getStreamsByType(ServiceType.TRANSMITTER).first().single()
 
         assertEquals(id, result.id)
-        assertEquals(ServiceType.MIC, result.serviceType)
+        assertEquals(ServiceType.TRANSMITTER, result.serviceType)
         assertEquals("Mic One", result.name)
         assertEquals("192.168.1.10", result.host)
         assertEquals(6980, result.port)
         assertEquals(NetQuality.OPTIMAL, result.netQuality)
         assertEquals(TransportMode.WIFI, result.transportMode)
         assertEquals(false, result.lowLatency)
+        assertEquals(SourceType.MIC, result.sourceType)
+        assertEquals(false, result.broadcastMode)
         assertEquals(1.0f, result.volume, 0.0001f)
         assertEquals(true, result.isEnabled)
     }
 
     @Test
     fun serviceTypeFilterOnlyReturnsMatchingStreams() = runTest {
-        repository.insertOrUpdate(stream(serviceType = ServiceType.MIC, name = "Mic"))
+        repository.insertOrUpdate(stream(serviceType = ServiceType.TRANSMITTER, name = "Mic"))
         repository.insertOrUpdate(stream(serviceType = ServiceType.RECEIVER, name = "Receiver"))
 
-        val result = repository.getStreamsByType(ServiceType.MIC).first()
+        val result = repository.getStreamsByType(ServiceType.TRANSMITTER).first()
 
         assertEquals(listOf("Mic"), result.map { it.name })
     }
@@ -104,7 +107,7 @@ class StreamRepositoryTest {
         val id = repository.insertOrUpdate(stream(isEnabled = true))
 
         repository.setEnabled(id, false)
-        val result = repository.getStreamsByType(ServiceType.MIC).first().single()
+        val result = repository.getStreamsByType(ServiceType.TRANSMITTER).first().single()
 
         assertFalse(result.isEnabled)
     }
@@ -114,7 +117,7 @@ class StreamRepositoryTest {
         val id = repository.insertOrUpdate(stream(volume = 1.0f))
 
         repository.setVolume(id, 1.5f)
-        val result = repository.getStreamsByType(ServiceType.MIC).first().single()
+        val result = repository.getStreamsByType(ServiceType.TRANSMITTER).first().single()
 
         assertEquals(1.5f, result.volume, 0.0001f)
     }
@@ -125,7 +128,7 @@ class StreamRepositoryTest {
         repository.insertOrUpdate(stream(name = "Second"))
 
         repository.delete(stream(id = firstId, name = "First"))
-        val result = repository.getStreamsByType(ServiceType.MIC).first()
+        val result = repository.getStreamsByType(ServiceType.TRANSMITTER).first()
 
         assertEquals(listOf("Second"), result.map { it.name })
     }
@@ -136,7 +139,7 @@ class StreamRepositoryTest {
         repository.insertOrUpdate(stream(name = "Alpha"))
         repository.insertOrUpdate(stream(name = "Mu"))
 
-        val result = repository.getStreamsByType(ServiceType.MIC).first()
+        val result = repository.getStreamsByType(ServiceType.TRANSMITTER).first()
 
         assertEquals(listOf("Alpha", "Mu", "Zeta"), result.map { it.name })
     }
@@ -145,7 +148,7 @@ class StreamRepositoryTest {
     fun flowEmitsAgainWhenStreamChanges() = runBlocking {
         val emissions = Channel<List<Stream>>(Channel.UNLIMITED)
         val job = launch {
-            repository.getStreamsByType(ServiceType.MIC).collect {
+            repository.getStreamsByType(ServiceType.TRANSMITTER).collect {
                 emissions.send(it)
             }
         }
@@ -164,7 +167,7 @@ class StreamRepositoryTest {
     fun flowEmitsAgainWhenVolumeChanges() = runBlocking {
         val emissions = Channel<List<Stream>>(Channel.UNLIMITED)
         val job = launch {
-            repository.getStreamsByType(ServiceType.MIC).collect {
+            repository.getStreamsByType(ServiceType.TRANSMITTER).collect {
                 emissions.send(it)
             }
         }
@@ -181,13 +184,15 @@ class StreamRepositoryTest {
 
     private fun stream(
         id: Long = 0,
-        serviceType: ServiceType = ServiceType.MIC,
+        serviceType: ServiceType = ServiceType.TRANSMITTER,
         name: String = "Stream",
         host: String = "192.168.1.10",
         port: Int = 6980,
         netQuality: NetQuality = NetQuality.OPTIMAL,
         transportMode: TransportMode = TransportMode.WIFI,
         lowLatency: Boolean = false,
+        sourceType: SourceType = SourceType.MIC,
+        broadcastMode: Boolean = false,
         volume: Float = 1.0f,
         isEnabled: Boolean = true,
     ): Stream =
@@ -200,6 +205,8 @@ class StreamRepositoryTest {
             netQuality = netQuality,
             transportMode = transportMode,
             lowLatency = lowLatency,
+            sourceType = sourceType,
+            broadcastMode = broadcastMode,
             volume = volume,
             isEnabled = isEnabled,
         )

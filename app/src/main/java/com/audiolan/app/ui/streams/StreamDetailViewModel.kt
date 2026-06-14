@@ -8,10 +8,12 @@ import androidx.lifecycle.viewModelScope
 import com.audiolan.app.data.repository.StreamRepository
 import com.audiolan.app.domain.model.NetQuality
 import com.audiolan.app.domain.model.ServiceType
+import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.domain.model.TransportMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -23,6 +25,8 @@ class StreamDetailViewModel @Inject constructor(
     var port by mutableStateOf("6980")
     var netQuality by mutableStateOf(NetQuality.OPTIMAL)
     var transportMode by mutableStateOf(TransportMode.WIFI)
+    var sourceType by mutableStateOf(SourceType.MIC)
+    var broadcastMode by mutableStateOf(false)
 
     var nameError by mutableStateOf<String?>(null)
     var portError by mutableStateOf<String?>(null)
@@ -62,6 +66,8 @@ class StreamDetailViewModel @Inject constructor(
             port = stream.port.toString()
             netQuality = stream.netQuality
             transportMode = stream.transportMode
+            sourceType = stream.sourceType
+            broadcastMode = stream.broadcastMode
             existingVolume = stream.volume
             existingEnabled = stream.isEnabled
             validate()
@@ -92,19 +98,33 @@ class StreamDetailViewModel @Inject constructor(
 
     fun save(serviceType: ServiceType, onSuccess: () -> Unit) {
         if (!validate()) return
-        val stream = Stream(
-            id = editingStreamId ?: 0L,
-            serviceType = serviceType,
-            name = name.trim(),
-            host = host.trim(),
-            port = port.toInt(),
-            netQuality = netQuality,
-            transportMode = transportMode,
-            lowLatency = false,
-            volume = if (isEditMode) existingVolume else 1.0f,
-            isEnabled = if (isEditMode) existingEnabled else true,
-        )
         viewModelScope.launch {
+            val trimmedName = name.trim()
+            val duplicateName = streamRepository.getStreamsByType(serviceType)
+                .first()
+                .any { stream ->
+                    stream.id != editingStreamId &&
+                        stream.name.equals(trimmedName, ignoreCase = true)
+                }
+            if (duplicateName) {
+                nameError = "name already exists in this ${serviceType.name.lowercase()} service"
+                return@launch
+            }
+
+            val stream = Stream(
+                id = editingStreamId ?: 0L,
+                serviceType = serviceType,
+                name = trimmedName,
+                host = host.trim(),
+                port = port.toInt(),
+                netQuality = netQuality,
+                transportMode = transportMode,
+                lowLatency = false,
+                sourceType = sourceType,
+                broadcastMode = broadcastMode,
+                volume = if (isEditMode) existingVolume else 1.0f,
+                isEnabled = if (isEditMode) existingEnabled else true,
+            )
             streamRepository.insertOrUpdate(stream)
             onSuccess()
         }

@@ -49,14 +49,12 @@ class MainActivity : ComponentActivity() {
                 val bottomBarHiddenRoutes = setOf(
                     Screen.StreamDetail.route,
                     Screen.Discovery.route,
-                    Screen.MicSettings.route,
-                    Screen.CastSettings.route,
+                    Screen.TransmitterSettings.route,
                     Screen.ReceiverSettings.route,
                 )
                 val bottomBarRoutes = setOf(
                     Screen.Home.route,
-                    Screen.Mic.route,
-                    Screen.Cast.route,
+                    Screen.Transmitter.route,
                     Screen.Receiver.route,
                     Screen.Settings.route,
                 )

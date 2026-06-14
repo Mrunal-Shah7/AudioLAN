@@ -2,13 +2,11 @@
 <resources>
     <string name="app_name">AudioLAN</string>
     <string name="app_description">Real-time audio streaming over LAN</string>
-    <string name="notification_mic_service_title">Microphone Service</string>
-    <string name="notification_cast_service_title">Cast Service</string>
+    <string name="notification_transmitter_service_title">Transmitter Service</string>
     <string name="notification_receiver_service_title">Receiver Service</string>
     <string name="notification_service_running">Running</string>
     <string name="notification_action_stop">Stop</string>
-    <string name="notif_mic_title">Microphone Service</string>
-    <string name="notif_cast_title">Cast Service</string>
+    <string name="notif_transmitter_title">Transmitter</string>
     <string name="notif_receiver_title">Receiver Service</string>
     <string name="notif_action_stop">Stop</string>
 </resources>

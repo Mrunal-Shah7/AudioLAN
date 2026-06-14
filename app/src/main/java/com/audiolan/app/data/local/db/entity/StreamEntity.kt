@@ -6,6 +6,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.audiolan.app.domain.model.NetQuality
 import com.audiolan.app.domain.model.ServiceType
+import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.domain.model.TransportMode
 
@@ -22,6 +23,8 @@ data class StreamEntity(
     @ColumnInfo(name = "net_quality") val netQuality: String,
     @ColumnInfo(name = "transport_mode") val transportMode: String = TransportMode.WIFI.name,
     @ColumnInfo(name = "low_latency") val lowLatency: Boolean = false,
+    @ColumnInfo(name = "source_type", defaultValue = "'MIC'") val sourceType: String = SourceType.MIC.name,
+    @ColumnInfo(name = "broadcast_mode", defaultValue = "0") val broadcastMode: Boolean = false,
     val volume: Float = 1.0f,
     @ColumnInfo(name = "is_enabled") val isEnabled: Boolean = true,
 )
@@ -29,13 +32,15 @@ data class StreamEntity(
 fun StreamEntity.toDomain(): Stream =
     Stream(
         id = id,
-        serviceType = ServiceType.valueOf(serviceType),
+        serviceType = runCatching { ServiceType.valueOf(serviceType) }.getOrDefault(ServiceType.TRANSMITTER),
         name = name,
         host = host,
         port = port,
         netQuality = NetQuality.valueOf(netQuality),
         transportMode = runCatching { TransportMode.valueOf(transportMode) }.getOrDefault(TransportMode.WIFI),
         lowLatency = lowLatency,
+        sourceType = runCatching { SourceType.valueOf(sourceType) }.getOrDefault(SourceType.MIC),
+        broadcastMode = broadcastMode,
         volume = volume,
         isEnabled = isEnabled,
     )
@@ -50,6 +55,8 @@ fun Stream.toEntity(): StreamEntity =
         netQuality = netQuality.name,
         transportMode = transportMode.name,
         lowLatency = lowLatency,
+        sourceType = sourceType.name,
+        broadcastMode = broadcastMode,
         volume = volume,
         isEnabled = isEnabled,
     )

@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -53,11 +53,12 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MicSettingsScreen(
+fun TransmitterSettingsScreen(
     navController: NavController,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val settings by viewModel.micSettings.collectAsStateWithLifecycle()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val settings by viewModel.transmitterSettings.collectAsStateWithLifecycle()
     var showAudioSourceDialog by remember { mutableStateOf(false) }
     var showInputChannelDialog by remember { mutableStateOf(false) }
     var showSampleRateDialog by remember { mutableStateOf(false) }
@@ -70,7 +71,7 @@ fun MicSettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "microphone settings",
+                        text = "transmitter settings",
                         color = TextPrimary,
                         style = MaterialTheme.typography.headlineMedium,
                     )
@@ -84,7 +85,11 @@ fun MicSettingsScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { innerPadding ->
@@ -92,6 +97,7 @@ fun MicSettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = innerPadding.calculateTopPadding())
+                .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .navigationBarsPadding()
                 .padding(horizontal = Dimensions.ScreenHorizontalPadding)
                 .verticalScroll(rememberScrollState())
@@ -103,6 +109,15 @@ fun MicSettingsScreen(
                 value = audioSourceLabel(settings.audioSource),
                 requiresRestart = true,
                 onClick = { showAudioSourceDialog = true },
+            )
+            Text(
+                text = "applies to microphone streams only",
+                color = TextSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(
+                    start = Dimensions.RowHorizontalPadding,
+                    top = Dimensions.SpaceXXS,
+                ),
             )
             Spacer(Modifier.height(Dimensions.RowSpacing))
             SettingsRow(
@@ -134,10 +149,10 @@ fun MicSettingsScreen(
                 onClick = { showBufferSizeDialog = true },
             )
             Spacer(Modifier.height(Dimensions.RowSpacing))
-            MicVolumeCard(
+            TransmitterVolumeCard(
                 volume = settings.globalVolume,
-                onVolumeChange = viewModel::setMicGlobalVolume,
-                onReset = viewModel::resetMicGlobalVolume,
+                onVolumeChange = viewModel::setTransmitterGlobalVolume,
+                onReset = viewModel::resetTransmitterGlobalVolume,
             )
             Spacer(Modifier.height(Dimensions.SpaceM))
         }
@@ -149,7 +164,7 @@ fun MicSettingsScreen(
             options = listOf("DEFAULT", "VOICE_COMM"),
             selected = settings.audioSource,
             labelFor = ::audioSourceLabel,
-            onSelect = viewModel::setMicAudioSource,
+            onSelect = viewModel::setTransmitterAudioSource,
             onDismiss = { showAudioSourceDialog = false },
         )
     }
@@ -159,7 +174,7 @@ fun MicSettingsScreen(
             options = listOf("MONO", "STEREO"),
             selected = settings.inputChannel,
             labelFor = { it.lowercase(Locale.US) },
-            onSelect = viewModel::setMicInputChannel,
+            onSelect = viewModel::setTransmitterInputChannel,
             onDismiss = { showInputChannelDialog = false },
         )
     }
@@ -169,7 +184,7 @@ fun MicSettingsScreen(
             options = listOf(44_100, 48_000),
             selected = settings.sampleRate,
             labelFor = { "$it Hz" },
-            onSelect = viewModel::setMicSampleRate,
+            onSelect = viewModel::setTransmitterSampleRate,
             onDismiss = { showSampleRateDialog = false },
         )
     }
@@ -179,7 +194,7 @@ fun MicSettingsScreen(
             initialValue = settings.bufferSize.toString(),
             onDismiss = { showBufferSizeDialog = false },
             onSave = { bufferSize ->
-                viewModel.setMicBufferSize(bufferSize)
+                viewModel.setTransmitterBufferSize(bufferSize)
                 showBufferSizeDialog = false
             },
         )
@@ -187,7 +202,7 @@ fun MicSettingsScreen(
 }
 
 @Composable
-private fun MicVolumeCard(
+private fun TransmitterVolumeCard(
     volume: Float,
     onVolumeChange: (Float) -> Unit,
     onReset: () -> Unit,
@@ -220,8 +235,8 @@ private fun MicVolumeCard(
                 volume = volume,
                 onVolumeChange = onVolumeChange,
                 onReset = onReset,
-                contentDescription = "global microphone volume, current value ${
-                    String.format(java.util.Locale.US, "%.0f", volume * 100)
+                contentDescription = "global transmitter volume, current value ${
+                    String.format(Locale.US, "%.0f", volume * 100)
                 } percent",
             )
         }

@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Network
 import android.media.AudioTrack
 import androidx.core.app.NotificationCompat
 import com.audiolan.app.R
@@ -60,9 +61,23 @@ class ReceiverService : BaseStreamingService() {
 
         serviceScope.launch {
             try {
-                if (udpSocket == null) {
-                    udpSocket = DatagramSocket(PORT)
+                val enabledStreams = streamRepository.getStreamsByType(ServiceType.RECEIVER).first()
+                    .filter { it.isEnabled }
+                val duplicateNames = duplicateStreamNames(enabledStreams)
+                if (duplicateNames.isNotEmpty()) {
+                    Timber.w("ReceiverService duplicate stream names: ${duplicateNames.joinToString()}")
+                    serviceManager.updateReceiverState(
+                        ServiceState.Error("Duplicate receiver stream name: ${duplicateNames.joinToString()}"),
+                    )
+                    stopSelf()
+                    return@launch
                 }
+                if (udpSocket == null) {
+                    udpSocket = DatagramSocket(PORT).also { socket ->
+                        bindSocketToWifiNetwork(socket)
+                    }
+                }
+                registerWifiNetworkCallback()
                 serviceManager.updateReceiverState(ServiceState.Running)
                 updateNotification("listening on port $PORT")
 
@@ -87,6 +102,18 @@ class ReceiverService : BaseStreamingService() {
             }
         }
         return START_STICKY
+    }
+
+    override fun onWifiNetworkAvailable(network: Network) {
+        udpSocket?.let { socket ->
+            runCatching {
+                network.bindSocket(socket)
+                Timber.d("ReceiverService: rebound listener socket to Wi-Fi network $network")
+            }.onFailure { throwable ->
+                Timber.w(throwable, "ReceiverService: failed to rebind listener socket to Wi-Fi network")
+            }
+        }
+        super.onWifiNetworkAvailable(network)
     }
 
     private suspend fun collectEnabledStreamNames() {
@@ -162,6 +189,9 @@ class ReceiverService : BaseStreamingService() {
         var configuredSampleRate: Int? = null
         var configuredChannels: Int? = null
         val settings = settingsRepository.getReceiverSettings().first()
+        var lastLevelEmissionMs = 0L
+        var levelEmissionCount = 0
+        var levelLogWindowMs = System.currentTimeMillis()
 
         Timber.d("ReceiverService: playback loop started for stream ${stream.name}")
         try {
@@ -199,6 +229,19 @@ class ReceiverService : BaseStreamingService() {
                     playbackPcm.copyOf().also { AudioUtils.applyVolume(it, combinedVolume) }
                 } else {
                     playbackPcm
+                }
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - lastLevelEmissionMs >= LEVEL_EMISSION_INTERVAL_MS) {
+                    val peakChannels = packet.header.numChannels.coerceAtMost(MAX_PLAYBACK_CHANNELS)
+                    val peak = AudioUtils.computePeakLevel(pcm, peakChannels)
+                    serviceManager.updateReceiverLevel(peak.first, peak.second)
+                    lastLevelEmissionMs = nowMs
+                    levelEmissionCount++
+                    if (nowMs - levelLogWindowMs >= LEVEL_LOG_WINDOW_MS) {
+                        Timber.v("Receiver level emissions for ${stream.name}: $levelEmissionCount/sec")
+                        levelEmissionCount = 0
+                        levelLogWindowMs = nowMs
+                    }
                 }
                 localAudioTrack?.let { writeFully(it, pcm) }
             }
@@ -297,6 +340,14 @@ class ReceiverService : BaseStreamingService() {
         }
     }
 
+    private fun duplicateStreamNames(streams: List<Stream>): List<String> =
+        streams
+            .groupBy { it.name.trim().lowercase() }
+            .filterKeys { it.isNotBlank() }
+            .filterValues { it.size > 1 }
+            .values
+            .mapNotNull { duplicates -> duplicates.firstOrNull()?.name }
+
     override fun onServiceDestroyed() {
         udpSocket?.close()
         udpSocket = null
@@ -313,6 +364,7 @@ class ReceiverService : BaseStreamingService() {
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         serviceManager.updateReceiverState(ServiceState.Idle)
+        serviceManager.clearReceiverLevel()
         Timber.d("ReceiverService destroyed")
     }
 
@@ -373,5 +425,7 @@ class ReceiverService : BaseStreamingService() {
         const val JITTER_PREBUFFER_PACKETS = 16
         const val MAX_PLAYBACK_CHANNELS = 2
         const val BYTES_PER_SAMPLE_16BIT = 2
+        const val LEVEL_EMISSION_INTERVAL_MS = 50L
+        const val LEVEL_LOG_WINDOW_MS = 1_000L
     }
 }

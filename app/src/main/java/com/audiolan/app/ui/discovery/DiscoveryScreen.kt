@@ -2,6 +2,8 @@ package com.audiolan.app.ui.discovery
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,6 +54,7 @@ import com.audiolan.app.ui.theme.Dimensions
 import com.audiolan.app.ui.theme.Surface as AudioLANSurface
 import com.audiolan.app.ui.theme.TextPrimary
 import com.audiolan.app.ui.theme.TextSecondary
+import com.audiolan.app.util.AnimationUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,6 +63,7 @@ fun DiscoveryScreen(
     viewModel: DiscoveryViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val animationsEnabled = AnimationUtils.isSystemAnimationEnabled(context) && !LocalInspectionMode.current
     val pongScope = rememberCoroutineScope()
     DisposableEffect(Unit) {
         val responderJob = PongResponder(context, pongScope).start()
@@ -160,6 +165,12 @@ fun DiscoveryScreen(
                     items(devices, key = { "${it.ip}:${it.port}:${it.streamName.orEmpty()}" }) { device ->
                         DeviceResultCard(
                             device = device,
+                            modifier = Modifier.animateItem(
+                                placementSpec = spring(
+                                    dampingRatio = if (animationsEnabled) 0.75f else 1f,
+                                    stiffness = if (animationsEnabled) 200f else Spring.StiffnessHigh,
+                                ),
+                            ),
                             onClick = {
                                 viewModel.onDeviceSelected(device) { route ->
                                     navController.navigate(route)
@@ -206,6 +217,7 @@ fun DiscoveryScreen(
 @Composable
 private fun DeviceResultCard(
     device: MergedDevice,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val hasPingPong = device.sources.contains(DiscoverySource.PING_PONG)
@@ -219,7 +231,7 @@ private fun DeviceResultCard(
     }
 
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         color = AudioLANSurface,
