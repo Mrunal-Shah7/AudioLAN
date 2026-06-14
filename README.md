@@ -6,7 +6,7 @@ AudioLAN is an Android app for sending and receiving low-latency PCM audio over 
 
 | Home | Stream List |
 | --- | --- |
-| <img src="references/Screenshot_20260521-015250.Moto%20App%20Launcher.png" alt="AudioLAN home screen" width="260"> | <img src="references/Screenshot_20260521-015318.Moto%20App%20Launcher.png" alt="AudioLAN stream list" width="260"> |
+| <img src="references\Screenshot_20260615-002314.Moto App Launcher.png" alt="AudioLAN home screen" width="260"> | <img src="references/Screenshot_20260521-015318.Moto%20App%20Launcher.png" alt="AudioLAN stream list" width="260"> |
 
 | Discovery | Settings |
 | --- | --- |
