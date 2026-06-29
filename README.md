@@ -1,27 +1,28 @@
 # AudioLAN
 
-AudioLAN is an Android app for sending and receiving low-latency PCM audio over a local network using VBAN-compatible UDP streams. It supports microphone streaming, device audio capture, receiver playback, network discovery, and an optional USB tethering transport path for IP audio over a USB cable.
+AudioLAN is an Android app for sending and receiving low-latency PCM audio over a local network using VBAN-compatible UDP streams. It supports microphone streaming, device audio capture, receiver playback, network discovery, and simultaneous multi-network transmit/receive over Wi-Fi and USB tethering.
 
 ## Screenshots
 
-| Home | Stream List |
+| Home | Create Transmitter |
 | --- | --- |
-| <img src="references\Screenshot_20260615-002314.Moto App Launcher.png" alt="AudioLAN home screen" width="260"> | <img src="references/Screenshot_20260521-015318.Moto%20App%20Launcher.png" alt="AudioLAN stream list" width="260"> |
+| <img src="references\home.jpg" alt="AudioLAN home screen" width="260"> | <img src="references/edit_tx.jpg" alt="AudioLAN stream list" width="260"> |
 
-| Discovery | Settings |
+| Receiver | Settings |
 | --- | --- |
-| <img src="references/Screenshot_20260521-015326.Moto%20App%20Launcher.png" alt="AudioLAN discovery screen" width="260"> | <img src="references/Screenshot_20260521-015331.Moto%20App%20Launcher.png" alt="AudioLAN settings screen" width="260"> |
+| <img src="references/rx.jpg" alt="AudioLAN discovery screen" width="260"> | <img src="references/settings.jpg" alt="AudioLAN settings screen" width="260"> |
 
 ## Features
 
 - Stream microphone audio from Android to VBAN receivers such as Voicemeeter.
 - Stream Android playback/cast audio using MediaProjection audio capture.
-- Receive VBAN audio streams on Android.
-- Discover compatible streams and devices on the network.
-- Configure per-stream host, port, transport mode, quality, volume, and enable state.
-- Use Wi-Fi or USB tethering as the IP transport.
+- Receive VBAN audio streams on Android, including non-16-bit PCM and float formats normalized for playback.
+- Discover compatible streams and devices on the network, with the source network shown per discovered stream and self-originated streams flagged to prevent feedback loops.
+- Configure per-stream host, port, network, quality, volume, and enable state. Volume changes apply live without interrupting playback.
+- Select any active network interface per stream (Wi-Fi, USB tethering, etc.), with support for transmitting and receiving across multiple networks at the same time.
+- Automatic receiver recovery after a transmitter is stopped and restarted.
 - Foreground services for microphone, cast, receiver, and discovery workflows.
-- Dark UI with selectable accent colors, system accent support, and AMOLED background mode.
+- Dark UI with selectable accent colors, system accent support, and AMOLED background mode, following Material 3 design.
 
 ## Requirements
 
@@ -123,14 +124,12 @@ versionName = "1.0.0"
 
 For every published update, increase `versionCode`. Android requires `versionCode` to be an integer.
 
-## USB Tethering Mode
+## Network Selection & Multi-Network Support
 
-USB tethering mode uses Android USB tethering as an IP network link. It is not USB Audio Class and does not create a direct USB audio device. The app still sends and receives VBAN-compatible UDP packets, but the route can go over the USB tethering interface instead of Wi-Fi.
+Each stream selects its network from the device's currently active interfaces (Wi-Fi, USB tethering, etc.) instead of a fixed transport type. Different streams can target different networks at the same time, and the receiver listens across all active networks simultaneously rather than being limited to one. USB tethering uses Android USB tethering as an IP network link; it is not USB Audio Class and does not create a direct USB audio device. The app still sends and receives VBAN-compatible UDP packets, just routed over whichever interface a stream selects.
 
 ## Notes
 
-- Receiver playback expects compatible PCM VBAN streams. The app currently focuses on 16-bit PCM playback and includes receiver-side jitter buffering and stereo playback handling.
-- Network discovery is intended for receiver setup and stream detection.
+- Receiver playback decodes PCM VBAN streams, including 8/16/24/32-bit integer and 32/64-bit float formats, and includes jitter buffering, stereo playback handling, and automatic recovery if the sender restarts.
+- Network discovery is intended for receiver setup and stream detection. Streams originating from the same device are shown but cannot be saved as receiver streams, to prevent audio feedback loops.
 - Release artifacts, local SDK config, build outputs, and signing files are excluded from Git through `.gitignore`.
-
-
