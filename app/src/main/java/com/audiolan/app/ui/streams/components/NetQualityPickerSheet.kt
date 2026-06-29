@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,10 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.audiolan.app.domain.model.NetQuality
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,16 +31,13 @@ fun NetQualityPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(),
-        containerColor = AudioLANSurface,
-        shape = RoundedCornerShape(
-            topStart = Dimensions.SpaceM,
-            topEnd = Dimensions.SpaceM,
-        ),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column {
             Text(
                 text = "net quality",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(
                     horizontal = Dimensions.SpaceM,
@@ -67,7 +60,11 @@ fun NetQualityPickerSheet(
                 ) {
                     Text(
                         text = entry.name.lowercase(Locale.US).replace('_', ' '),
-                        color = if (entry == selected) MaterialTheme.colorScheme.primary else TextPrimary,
+                        color = if (entry == selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.weight(1f),
                     )
@@ -81,7 +78,7 @@ fun NetQualityPickerSheet(
                 }
                 if (index != NetQuality.entries.lastIndex) {
                     HorizontalDivider(
-                        color = CardBorder,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         thickness = Dimensions.CardBorderWidth,
                     )
                 }

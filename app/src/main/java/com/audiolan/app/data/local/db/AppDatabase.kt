@@ -7,7 +7,7 @@ import com.audiolan.app.data.local.db.entity.StreamEntity
 
 @Database(
     entities = [StreamEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -1,17 +1,14 @@
 package com.audiolan.app.ui.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
@@ -34,10 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.audiolan.app.ui.streams.components.VolumeSliderRow
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +50,7 @@ fun ReceiverSettingsScreen(
                 title = {
                     Text(
                         text = "receiver settings",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 },
@@ -65,13 +59,13 @@ fun ReceiverSettingsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "navigate back",
-                            tint = TextPrimary,
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
             )
@@ -106,9 +100,9 @@ private fun ReceiverVolumeCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.RowCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
     ) {
         Column(
             modifier = Modifier.padding(
@@ -118,7 +112,7 @@ private fun ReceiverVolumeCard(
         ) {
             Text(
                 text = "global volume",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
             )

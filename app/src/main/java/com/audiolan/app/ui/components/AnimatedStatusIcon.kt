@@ -26,8 +26,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
-import com.audiolan.app.ui.theme.StatusError
-import com.audiolan.app.ui.theme.StatusSuccess
 import com.audiolan.app.util.AnimationUtils
 
 sealed interface StreamStatus {
@@ -75,7 +73,7 @@ fun AnimatedStatusIcon(
                 is StreamStatus.Error -> Icon(
                     imageVector = Icons.Default.ErrorOutline,
                     contentDescription = target.message,
-                    tint = StatusError,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -85,13 +83,15 @@ fun AnimatedStatusIcon(
 
 @Composable
 private fun StaticDot() {
+    val color = MaterialTheme.colorScheme.tertiary
     Canvas(modifier = Modifier.size(10.dp)) {
-        drawCircle(color = StatusSuccess)
+        drawCircle(color = color)
     }
 }
 
 @Composable
 private fun CheckmarkIcon(animationsEnabled: Boolean) {
+    val color = MaterialTheme.colorScheme.tertiary
     val progress = remember { Animatable(if (animationsEnabled) 0f else 1f) }
     LaunchedEffect(animationsEnabled) {
         if (animationsEnabled) {
@@ -110,7 +110,7 @@ private fun CheckmarkIcon(animationsEnabled: Boolean) {
         val secondProgress = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
 
         drawLine(
-            color = StatusSuccess,
+            color = color,
             start = start,
             end = Offset(
                 x = start.x + (mid.x - start.x) * firstProgress,
@@ -121,7 +121,7 @@ private fun CheckmarkIcon(animationsEnabled: Boolean) {
         )
         if (p > 0.45f) {
             drawLine(
-                color = StatusSuccess,
+                color = color,
                 start = mid,
                 end = Offset(
                     x = mid.x + (end.x - mid.x) * secondProgress,

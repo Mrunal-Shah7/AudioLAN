@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -47,14 +45,7 @@ import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.ui.components.AnimatedStatusIcon
 import com.audiolan.app.ui.components.StreamStatus
-import com.audiolan.app.ui.theme.CardBorder
-import com.audiolan.app.ui.theme.DeleteBackground
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.OnDelete
-import com.audiolan.app.ui.theme.LocalToggleThumbColor
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import com.audiolan.app.util.AnimationUtils
 
 @Composable
@@ -79,9 +70,9 @@ fun StreamCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.CardCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(
             modifier = Modifier
@@ -98,7 +89,7 @@ fun StreamCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stream.name,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -110,19 +101,19 @@ fun StreamCard(
                         } else {
                             "${stream.host}:${stream.port}"
                         },
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     if (stream.serviceType == ServiceType.TRANSMITTER) {
                         Text(
                             text = buildTransmitterLabels(stream),
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     Text(
-                        text = stream.transportMode.displayName,
-                        color = TextSecondary,
+                        text = stream.networkSelection.displayName,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -139,7 +130,7 @@ fun StreamCard(
                 ) { running ->
                     if (running) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AnimatedStatusIcon(status = status ?: StreamStatus.Connecting)
+                            status?.let { AnimatedStatusIcon(status = it) }
                             Switch(
                                 checked = stream.isEnabled,
                                 onCheckedChange = onToggle,
@@ -194,22 +185,24 @@ fun StreamCard(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
-                    shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+                    shape = MaterialTheme.shapes.small,
                     contentPadding = PaddingValues(
                         horizontal = Dimensions.SmallButtonHorizPadding,
                         vertical = Dimensions.SmallButtonVerticalPadding,
                     ),
-                    modifier = Modifier.heightIn(min = Dimensions.SmallButtonMinHeight),
+                    modifier = Modifier
+                        .heightIn(min = Dimensions.SmallButtonMinHeight)
+                        .semantics { contentDescription = "edit ${stream.name}" },
                 ) {
-                    Text("open", style = MaterialTheme.typography.labelLarge)
+                    Text("edit", style = MaterialTheme.typography.labelLarge)
                 }
                 Button(
                     onClick = onDelete,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = DeleteBackground,
-                        contentColor = OnDelete,
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     ),
-                    shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+                    shape = MaterialTheme.shapes.small,
                     contentPadding = PaddingValues(
                         horizontal = Dimensions.SmallButtonHorizPadding,
                         vertical = Dimensions.SmallButtonVerticalPadding,
@@ -225,10 +218,11 @@ fun StreamCard(
 
 @Composable
 private fun switchColors() = SwitchDefaults.colors(
-    checkedThumbColor = LocalToggleThumbColor.current,
+    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
     checkedTrackColor = MaterialTheme.colorScheme.primary,
-    uncheckedThumbColor = TextSecondary,
-    uncheckedTrackColor = CardBorder,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outline,
 )
 
 private fun buildTransmitterLabels(stream: Stream): String =

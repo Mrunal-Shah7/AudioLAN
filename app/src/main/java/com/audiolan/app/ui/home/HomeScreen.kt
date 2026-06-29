@@ -5,9 +5,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,11 +29,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SettingsVoice
@@ -40,15 +40,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +64,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,16 +78,8 @@ import com.audiolan.app.domain.model.ServiceState
 import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.service.discovery.PongResponder
 import com.audiolan.app.ui.components.StreamStatus
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.NeutralButton
-import com.audiolan.app.ui.theme.OnNeutralButton
-import com.audiolan.app.ui.theme.StatusError
-import com.audiolan.app.ui.theme.StatusSuccess
-import com.audiolan.app.ui.theme.StatusWarning
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
+import com.audiolan.app.util.AnimationUtils
 import java.util.Locale
 import kotlin.math.log10
 import kotlin.math.max
@@ -170,6 +165,8 @@ fun HomeScreen(
     val receiverStreams by viewModel.receiverStreams.collectAsStateWithLifecycle()
     val transmitterStatuses by viewModel.transmitterStreamStatuses.collectAsStateWithLifecycle()
     val receiverStatuses by viewModel.receiverStreamStatuses.collectAsStateWithLifecycle()
+    val transmitterPanelError by viewModel.transmitterPanelError.collectAsStateWithLifecycle()
+    val receiverPanelError by viewModel.receiverPanelError.collectAsStateWithLifecycle()
     val transmitterLevel by viewModel.transmitterLevelState.collectAsStateWithLifecycle()
     val receiverLevel by viewModel.receiverLevelState.collectAsStateWithLifecycle()
     val networkInterfaces by viewModel.networkInterfaces.collectAsStateWithLifecycle()
@@ -177,7 +174,7 @@ fun HomeScreen(
     val allNetworkInterfaces = (networkInterfaces + usbTetherStatus.interfaces).distinctBy { it.interfaceName to it.ip }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = viewModel.snackbarHostState) },
+        snackbarHost = { InsetAwareSnackbarHost(hostState = viewModel.snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
     ) { innerPadding ->
@@ -201,6 +198,7 @@ fun HomeScreen(
                     serviceState = transmitterState,
                     streams = transmitterStreams,
                     streamStatuses = transmitterStatuses,
+                    panelError = transmitterPanelError,
                     level = transmitterLevel,
                     onStartService = {
                         if (transmitterState.isActionable()) {
@@ -226,7 +224,7 @@ fun HomeScreen(
                 VerticalDivider(
                     modifier = Modifier.fillMaxHeight(),
                     thickness = Dimensions.CardBorderWidth,
-                    color = CardBorder,
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 ServicePanel(
                     label = "Receive",
@@ -234,6 +232,7 @@ fun HomeScreen(
                     serviceState = receiverState,
                     streams = receiverStreams,
                     streamStatuses = receiverStatuses,
+                    panelError = receiverPanelError,
                     level = receiverLevel,
                     onStartService = {
                         if (receiverState.isActionable()) {
@@ -251,7 +250,7 @@ fun HomeScreen(
             HorizontalDivider(
                 modifier = Modifier.padding(top = Dimensions.SpaceM),
                 thickness = Dimensions.CardBorderWidth,
-                color = CardBorder,
+                color = MaterialTheme.colorScheme.outlineVariant,
             )
             AvailableNetworksSection(
                 interfaces = allNetworkInterfaces,
@@ -278,18 +277,36 @@ private fun HomeTopBar() {
         Spacer(Modifier.width(Dimensions.SpaceS))
         Text(
             text = "AudioLAN",
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = {}) {
-            Icon(
-                imageVector = Icons.Default.MoreVert,
-                contentDescription = "more options",
-                tint = TextSecondary,
-            )
-        }
+    }
+}
+
+@Composable
+private fun InsetAwareSnackbarHost(hostState: SnackbarHostState) {
+    val navBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Dimensions.ScreenHorizontalPadding)
+            .padding(bottom = Dimensions.BottomNavHeight + navBottomPadding + Dimensions.SpaceM),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        SnackbarHost(
+            hostState = hostState,
+            modifier = Modifier.fillMaxWidth(),
+            snackbar = { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    actionColor = MaterialTheme.colorScheme.primary,
+                )
+            },
+        )
     }
 }
 
@@ -300,6 +317,7 @@ private fun ServicePanel(
     serviceState: ServiceState,
     streams: List<Stream>,
     streamStatuses: Map<Long, StreamStatus>,
+    panelError: String?,
     level: Pair<Float, Float>,
     onStartService: () -> Unit,
     onStopService: () -> Unit,
@@ -311,9 +329,9 @@ private fun ServicePanel(
 
     Surface(
         modifier = modifier.fillMaxHeight(),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.CardCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(
             modifier = Modifier
@@ -324,13 +342,14 @@ private fun ServicePanel(
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                        shape = RoundedCornerShape(Dimensions.RowCornerRadius),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shape = MaterialTheme.shapes.small,
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier
                                 .padding(Dimensions.SpaceXS)
                                 .size(18.dp),
@@ -339,7 +358,7 @@ private fun ServicePanel(
                     Spacer(Modifier.width(Dimensions.SpaceS))
                     Text(
                         text = label,
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -351,7 +370,18 @@ private fun ServicePanel(
                     state = serviceState,
                     activeCount = activeCount,
                     totalCount = enabledStreams.size,
+                    hasInlineError = panelError != null,
                 )
+                panelError?.let { message ->
+                    Spacer(Modifier.height(Dimensions.SpaceXXS))
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             Box(
@@ -374,7 +404,7 @@ private fun ServicePanel(
                     )
                     Text(
                         text = dbReadout(level = level, isRunning = isRunning),
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
@@ -392,12 +422,10 @@ private fun ServicePanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Dimensions.SmallButtonMinHeight),
-                shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+                shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                    disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                 ),
                 contentPadding = PaddingValues(horizontal = Dimensions.SpaceS, vertical = Dimensions.SpaceS),
             ) {
@@ -460,12 +488,12 @@ private fun HomeAudioLevelMeter(
             ) {
                 Text(
                     text = "L",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
                     text = "R",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -485,7 +513,7 @@ private fun DbScale(modifier: Modifier = Modifier) {
         ).forEach { (label, fraction) ->
             Text(
                 text = label,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.End,
                 modifier = Modifier
@@ -504,16 +532,58 @@ private fun HomeMeterBar(
     height: Dp,
     modifier: Modifier = Modifier,
 ) {
-    val segmentColor = MaterialTheme.colorScheme.background.copy(alpha = 0.42f)
-    val displayLevel = when {
-        isRunning -> levelToMeterFraction(level).coerceIn(0.015f, 1f)
-        else -> 0.015f
+    val context = LocalContext.current
+    val animationsEnabled = AnimationUtils.isSystemAnimationEnabled(context) && !LocalInspectionMode.current
+    val segmentColor = MaterialTheme.colorScheme.surface
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val successColor = MaterialTheme.colorScheme.tertiary
+    val warningColor = MaterialTheme.colorScheme.secondary
+    val errorColor = MaterialTheme.colorScheme.error
+    val peakColor = MaterialTheme.colorScheme.onSurface
+    val targetLevel = if (isRunning) levelToMeterFraction(level).coerceIn(0f, 1f) else 0f
+    val displayedLevel = remember { Animatable(targetLevel) }
+    val peakLevel = remember { Animatable(targetLevel) }
+
+    LaunchedEffect(targetLevel, isRunning, animationsEnabled) {
+        if (!animationsEnabled) {
+            displayedLevel.snapTo(targetLevel)
+            peakLevel.snapTo(targetLevel)
+            return@LaunchedEffect
+        }
+        val durationMs = if (targetLevel > displayedLevel.value) {
+            HOME_METER_ATTACK_MS
+        } else {
+            HOME_METER_RELEASE_MS
+        }
+        displayedLevel.animateTo(
+            targetValue = targetLevel,
+            animationSpec = tween(durationMillis = durationMs, easing = LinearEasing),
+        )
     }
+
+    LaunchedEffect(targetLevel, animationsEnabled) {
+        if (!animationsEnabled) {
+            peakLevel.snapTo(targetLevel)
+            return@LaunchedEffect
+        }
+        if (targetLevel >= peakLevel.value) {
+            peakLevel.snapTo(targetLevel)
+        } else {
+            peakLevel.animateTo(
+                targetValue = targetLevel,
+                animationSpec = tween(durationMillis = HOME_PEAK_RELEASE_MS, easing = LinearEasing),
+            )
+        }
+    }
+
     Canvas(
         modifier = modifier.height(height),
     ) {
+        val displayLevel = when {
+            isRunning -> displayedLevel.value.coerceIn(0.015f, 1f)
+            else -> 0.015f
+        }
         val corner = CornerRadius(7.dp.toPx(), 7.dp.toPx())
-        val trackColor = TextSecondary.copy(alpha = 0.12f)
         drawRoundRect(
             color = trackColor,
             cornerRadius = corner,
@@ -533,9 +603,9 @@ private fun HomeMeterBar(
         }
 
         clipRect(top = size.height * (1f - displayLevel)) {
-            drawMeterZone(start = 0f, end = 0.6f, color = StatusSuccess, corner = corner)
-            drawMeterZone(start = 0.6f, end = 0.8f, color = StatusWarning, corner = corner)
-            drawMeterZone(start = 0.8f, end = 1f, color = StatusError, corner = corner)
+            drawMeterZone(start = 0f, end = 0.6f, color = successColor, corner = corner)
+            drawMeterZone(start = 0.6f, end = 0.8f, color = warningColor, corner = corner)
+            drawMeterZone(start = 0.8f, end = 1f, color = errorColor, corner = corner)
         }
 
         repeat(segmentCount - 1) { index ->
@@ -548,11 +618,11 @@ private fun HomeMeterBar(
             )
         }
 
-        val peakLevel = if (isRunning) levelToMeterFraction(level).coerceIn(0f, 1f) else 0f
-        if (peakLevel > 0.04f) {
-            val peakY = size.height * (1f - peakLevel)
+        val peak = if (isRunning) peakLevel.value.coerceIn(0f, 1f) else 0f
+        if (peak > 0.04f) {
+            val peakY = size.height * (1f - peak)
             drawLine(
-                color = TextPrimary,
+                color = peakColor,
                 start = Offset(0f, peakY),
                 end = Offset(size.width, peakY),
                 strokeWidth = Dimensions.CardBorderWidth.toPx(),
@@ -582,19 +652,27 @@ private fun StatusChip(
     state: ServiceState,
     activeCount: Int,
     totalCount: Int,
+    hasInlineError: Boolean,
 ) {
-    val (text, color, showDot) = when (state) {
-        ServiceState.Idle -> Triple("Stopped", TextSecondary, false)
-        ServiceState.Starting -> Triple("Starting", TextSecondary, false)
-        ServiceState.Running -> Triple("$activeCount / $totalCount active", TextPrimary, true)
-        ServiceState.Stopping -> Triple("Stopping", TextSecondary, false)
-        is ServiceState.Error -> Triple("error", StatusError, true)
+    val errorColor = MaterialTheme.colorScheme.error
+    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val activeColor = MaterialTheme.colorScheme.onSurface
+    val (text, color, showDot) = if (hasInlineError) {
+        Triple("error", errorColor, true)
+    } else {
+        when (state) {
+            ServiceState.Idle -> Triple("Stopped", inactiveColor, false)
+            ServiceState.Starting -> Triple("Starting", inactiveColor, false)
+            ServiceState.Running -> Triple("$activeCount / $totalCount active", activeColor, true)
+            ServiceState.Stopping -> Triple("Stopping", inactiveColor, false)
+            is ServiceState.Error -> Triple("error", errorColor, true)
+        }
     }
 
     Surface(
-        color = NeutralButton,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = Dimensions.SpaceXS, vertical = Dimensions.SpaceXXS),
@@ -604,7 +682,11 @@ private fun StatusChip(
                 Surface(
                     modifier = Modifier.size(6.dp),
                     shape = CircleShape,
-                    color = if (state is ServiceState.Error) StatusError else StatusSuccess,
+                    color = if (hasInlineError || state is ServiceState.Error) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    },
                     content = {},
                 )
                 Spacer(Modifier.width(Dimensions.SpaceXXS))
@@ -639,16 +721,16 @@ private fun AvailableNetworksSection(
         ) {
             Text(
                 text = "AVAILABLE NETWORKS",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             Button(
                 onClick = onRefresh,
-                shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+                shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = NeutralButton,
-                    contentColor = OnNeutralButton,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ),
                 contentPadding = PaddingValues(
                     horizontal = Dimensions.SpaceS,
@@ -682,13 +764,13 @@ private fun AvailableNetworksSection(
 private fun NetworkPlaceholder() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
     ) {
         Text(
             text = "no active network interfaces",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(
                 horizontal = Dimensions.NetworkCardHorizPadding,
@@ -702,9 +784,9 @@ private fun NetworkPlaceholder() {
 private fun NetworkInterfaceCard(info: NetworkInfo) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
     ) {
         Row(
             modifier = Modifier.padding(
@@ -715,14 +797,14 @@ private fun NetworkInterfaceCard(info: NetworkInfo) {
         ) {
             Text(
                 text = info.interfaceName,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = info.ip,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -744,6 +826,9 @@ private fun levelToMeterFraction(level: Float): Float {
 }
 
 private const val HOME_METER_DB_FLOOR = -24f
+private const val HOME_METER_ATTACK_MS = 45
+private const val HOME_METER_RELEASE_MS = 260
+private const val HOME_PEAK_RELEASE_MS = 2_000
 
 private fun ServiceState.isActionable(): Boolean =
     when (this) {

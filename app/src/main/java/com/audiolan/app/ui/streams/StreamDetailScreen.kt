@@ -18,14 +18,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.SettingsEthernet
-import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -65,16 +62,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.audiolan.app.domain.model.NetQuality
+import com.audiolan.app.domain.model.NetworkSelection
+import com.audiolan.app.domain.model.NetworkSelectionOption
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.SourceType
-import com.audiolan.app.domain.model.TransportMode
 import com.audiolan.app.ui.navigation.Screen
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.LocalToggleThumbColor
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +76,7 @@ fun StreamDetailScreen(
     streamId: Long,
     prefilledHost: String = "",
     prefilledStreamName: String = "",
-    prefilledTransportMode: String = "",
+    prefilledNetworkHint: String = "",
     prefilledLowLatency: Boolean = false,
     viewModel: StreamDetailViewModel = hiltViewModel(),
 ) {
@@ -104,14 +97,14 @@ fun StreamDetailScreen(
     val serviceType = remember(serviceTypeName) { ServiceType.valueOf(serviceTypeName) }
     val serviceLabel = if (serviceType == ServiceType.TRANSMITTER) "transmitter" else "receiver"
 
-    LaunchedEffect(streamId, prefilledHost, prefilledStreamName, prefilledTransportMode, prefilledLowLatency) {
+    LaunchedEffect(streamId, prefilledHost, prefilledStreamName, prefilledNetworkHint, prefilledLowLatency) {
         if (streamId != -1L) {
             viewModel.loadStream(streamId)
         } else {
             viewModel.applyPrefill(
                 hostValue = prefilledHost,
                 streamNameValue = prefilledStreamName,
-                transportModeValue = prefilledTransportMode,
+                networkHintValue = prefilledNetworkHint,
                 lowLatencyValue = prefilledLowLatency,
             )
         }
@@ -134,7 +127,7 @@ fun StreamDetailScreen(
                         } else {
                             "Edit $serviceLabel"
                         },
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -144,13 +137,13 @@ fun StreamDetailScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "navigate back",
-                            tint = TextPrimary,
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
             )
@@ -179,10 +172,8 @@ fun StreamDetailScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,
-                        disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f),
-                        disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                     ),
-                    shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+                    shape = MaterialTheme.shapes.small,
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
@@ -236,12 +227,15 @@ fun StreamDetailScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             )
             if (serviceType == ServiceType.TRANSMITTER) {
-                SourceDropdown(
-                    selected = viewModel.sourceType,
-                    onSelect = {
-                        viewModel.sourceType = it
-                    },
-                )
+                SegmentedField(label = "Source") {
+                    SegmentedControl(
+                        selected = viewModel.sourceType,
+                        options = sourceOptions,
+                        onSelect = {
+                            viewModel.sourceType = it
+                        },
+                    )
+                }
                 BroadcastRow(
                     checked = viewModel.broadcastMode,
                     onCheckedChange = {
@@ -271,17 +265,98 @@ fun StreamDetailScreen(
                     },
                 )
             }
-            SegmentedField(label = "Transport") {
-                SegmentedControl(
-                    selected = viewModel.transportMode,
-                    options = transportOptions,
-                    onSelect = {
-                        viewModel.transportMode = it
+            NetworkPickerField(
+                selected = viewModel.networkSelection,
+                options = viewModel.networkOptions,
+                onRefresh = viewModel::refreshNetworkOptions,
+                onSelect = {
+                    viewModel.networkSelection = it
+                },
+            )
+            Spacer(Modifier.height(Dimensions.SpaceL))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NetworkPickerField(
+    selected: NetworkSelection,
+    options: List<NetworkSelectionOption>,
+    onRefresh: () -> Unit,
+    onSelect: (NetworkSelection) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedOption = options.firstOrNull { it.selection == selected }
+    val selectedLabel = selectedOption?.label ?: selected.displayName
+
+    LaunchedEffect(Unit) {
+        onRefresh()
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = {
+            onRefresh()
+            expanded = it
+        },
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text("Network") },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            colors = audioTextFieldColors(),
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                text = option.label,
+                                color = if (option.isAvailable) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            option.address?.let { address ->
+                                Text(
+                                    text = address,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        onSelect(option.selection)
+                        expanded = false
                     },
                 )
             }
-            Spacer(Modifier.height(Dimensions.SpaceL))
         }
+    }
+    if (selectedOption?.isAvailable == false) {
+        Text(
+            text = "Selected network is unavailable",
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -317,69 +392,9 @@ private fun AudioTextField(
         },
         keyboardOptions = keyboardOptions,
         colors = audioTextFieldColors(),
-        shape = RoundedCornerShape(Dimensions.InputCornerRadius),
+        shape = MaterialTheme.shapes.small,
         modifier = modifier.fillMaxWidth(),
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SourceDropdown(
-    selected: SourceType,
-    onSelect: (SourceType) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-    ) {
-        OutlinedTextField(
-            value = sourceTypeLabel(selected),
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text("Source") },
-            trailingIcon = {
-                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-            },
-            colors = audioTextFieldColors(),
-            shape = RoundedCornerShape(Dimensions.InputCornerRadius),
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(),
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            SourceType.entries.forEach { sourceType ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = sourceTypeLabel(sourceType),
-                            color = TextPrimary,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    },
-                    onClick = {
-                        onSelect(sourceType)
-                        expanded = false
-                    },
-                    trailingIcon = if (sourceType == selected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    } else {
-                        null
-                    },
-                )
-            }
-        }
-    }
 }
 
 @Composable
@@ -391,9 +406,9 @@ private fun BroadcastRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) },
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.InputCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
     ) {
         Row(
             modifier = Modifier.padding(Dimensions.SpaceM),
@@ -402,13 +417,13 @@ private fun BroadcastRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Broadcast",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
                     text = "Send to every client on the network",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -429,7 +444,7 @@ private fun SegmentedField(
     Column(verticalArrangement = Arrangement.spacedBy(Dimensions.SpaceXS)) {
         Text(
             text = label,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -447,11 +462,12 @@ private fun <T> SegmentedControl(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
+        border = BorderStroke(Dimensions.CardBorderWidth, MaterialTheme.colorScheme.outline),
     ) {
-        Row(modifier = Modifier.clip(RoundedCornerShape(Dimensions.ButtonCornerRadius))) {
+        Row(modifier = Modifier.clip(MaterialTheme.shapes.small)) {
             options.forEachIndexed { index, option ->
                 Segment(
                     option = option,
@@ -464,7 +480,7 @@ private fun <T> SegmentedControl(
                         modifier = Modifier
                             .width(Dimensions.CardBorderWidth)
                             .height(48.dp),
-                        color = CardBorder,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
                 }
             }
@@ -479,7 +495,11 @@ private fun <T> Segment(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else TextSecondary
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -488,7 +508,7 @@ private fun <T> Segment(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = if (selected) MaterialTheme.colorScheme.primary else AudioLANSurface,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -521,25 +541,26 @@ private fun <T> Segment(
 @Composable
 private fun audioTextFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = MaterialTheme.colorScheme.primary,
-    unfocusedBorderColor = CardBorder,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
     focusedLabelColor = MaterialTheme.colorScheme.primary,
-    unfocusedLabelColor = TextSecondary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
     cursorColor = MaterialTheme.colorScheme.primary,
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedContainerColor = AudioLANSurface,
-    unfocusedContainerColor = AudioLANSurface,
-    errorContainerColor = AudioLANSurface,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    errorContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
     errorBorderColor = MaterialTheme.colorScheme.error,
     errorLabelColor = MaterialTheme.colorScheme.error,
 )
 
 @Composable
 private fun switchColors() = SwitchDefaults.colors(
-    checkedThumbColor = LocalToggleThumbColor.current,
+    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
     checkedTrackColor = MaterialTheme.colorScheme.primary,
-    uncheckedThumbColor = TextSecondary,
-    uncheckedTrackColor = CardBorder,
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    uncheckedBorderColor = MaterialTheme.colorScheme.outline,
 )
 
 private data class SegmentedOption<T>(
@@ -554,9 +575,9 @@ private val netQualityOptions = listOf(
     SegmentedOption(NetQuality.FAST, "High"),
 )
 
-private val transportOptions = listOf(
-    SegmentedOption(TransportMode.WIFI, "Wi-Fi", Icons.Default.Wifi),
-    SegmentedOption(TransportMode.USB_TETHER, "Ethernet", Icons.Default.SettingsEthernet),
+private val sourceOptions = listOf(
+    SegmentedOption(SourceType.MIC, "Microphone"),
+    SegmentedOption(SourceType.INTERNAL_AUDIO, "Internal audio"),
 )
 
 private fun netQualityUiValue(netQuality: NetQuality): NetQuality =
@@ -567,10 +588,4 @@ private fun netQualityUiValue(netQuality: NetQuality): NetQuality =
         NetQuality.SLOW,
         NetQuality.VERY_SLOW,
             -> NetQuality.SLOW
-    }
-
-private fun sourceTypeLabel(sourceType: SourceType): String =
-    when (sourceType) {
-        SourceType.MIC -> "Microphone"
-        SourceType.INTERNAL_AUDIO -> "Internal audio"
     }

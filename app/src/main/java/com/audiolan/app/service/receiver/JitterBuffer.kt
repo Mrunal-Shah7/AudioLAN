@@ -1,12 +1,14 @@
 package com.audiolan.app.service.receiver
 
 import com.audiolan.app.domain.vban.VbanHeader
+import com.audiolan.app.domain.model.NetworkSelection
 import java.util.TreeMap
 import timber.log.Timber
 
 data class ReceiverPacket(
     val header: VbanHeader,
     val pcm: ByteArray,
+    val originNetwork: NetworkSelection? = null,
 )
 
 class JitterBuffer(

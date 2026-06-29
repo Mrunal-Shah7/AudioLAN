@@ -1,5 +1,6 @@
 package com.audiolan.app.ui.streams
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -7,24 +8,31 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.audiolan.app.data.repository.StreamRepository
 import com.audiolan.app.domain.model.NetQuality
+import com.audiolan.app.domain.model.NetworkSelection
+import com.audiolan.app.domain.model.NetworkSelectionOption
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
-import com.audiolan.app.domain.model.TransportMode
+import com.audiolan.app.util.NetworkUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class StreamDetailViewModel @Inject constructor(
     private val streamRepository: StreamRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
     var name by mutableStateOf("")
     var host by mutableStateOf("")
     var port by mutableStateOf("6980")
     var netQuality by mutableStateOf(NetQuality.OPTIMAL)
-    var transportMode by mutableStateOf(TransportMode.WIFI)
+    var networkSelection by mutableStateOf(NetworkSelection.anyWifi())
+    var networkOptions by mutableStateOf<List<NetworkSelectionOption>>(emptyList())
     var sourceType by mutableStateOf(SourceType.MIC)
     var broadcastMode by mutableStateOf(false)
 
@@ -39,8 +47,12 @@ class StreamDetailViewModel @Inject constructor(
 
     val isEditMode: Boolean get() = editingStreamId != null
 
-    fun applyPrefill(hostValue: String, streamNameValue: String, transportModeValue: String, lowLatencyValue: Boolean) {
-        val key = "$hostValue|$streamNameValue|$transportModeValue|$lowLatencyValue"
+    init {
+        refreshNetworkOptions()
+    }
+
+    fun applyPrefill(hostValue: String, streamNameValue: String, networkHintValue: String, lowLatencyValue: Boolean) {
+        val key = "$hostValue|$streamNameValue|$networkHintValue|$lowLatencyValue"
         if (appliedPrefillKey == key || editingStreamId != null) return
         appliedPrefillKey = key
         if (hostValue.isNotBlank() && host.isBlank()) {
@@ -49,8 +61,16 @@ class StreamDetailViewModel @Inject constructor(
         if (streamNameValue.isNotBlank() && name.isBlank()) {
             name = streamNameValue
         }
-        if (transportModeValue.isNotBlank()) {
-            transportMode = runCatching { TransportMode.valueOf(transportModeValue) }.getOrDefault(TransportMode.WIFI)
+        val hintedNetworkSelection = NetworkSelection.fromRouteHint(networkHintValue)
+        when {
+            hintedNetworkSelection != null -> {
+                networkSelection = hintedNetworkSelection
+                refreshNetworkOptions()
+            }
+            networkHintValue == LEGACY_USB_TETHER_TRANSPORT -> {
+                networkSelection = NetworkSelection.anyUsbTether()
+                refreshNetworkOptions()
+            }
         }
         validate()
     }
@@ -65,12 +85,41 @@ class StreamDetailViewModel @Inject constructor(
             host = stream.host
             port = stream.port.toString()
             netQuality = stream.netQuality
-            transportMode = stream.transportMode
+            networkSelection = stream.networkSelection
             sourceType = stream.sourceType
             broadcastMode = stream.broadcastMode
             existingVolume = stream.volume
             existingEnabled = stream.isEnabled
+            refreshNetworkOptions()
             validate()
+        }
+    }
+
+    fun refreshNetworkOptions() {
+        viewModelScope.launch {
+            val liveOptions = withContext(Dispatchers.IO) {
+                NetworkUtils.getNetworkSelectionOptions(context)
+            }
+            if (!isEditMode && networkSelection.isAnyWifi && liveOptions.isNotEmpty()) {
+                networkSelection = liveOptions.first().selection
+            } else if (!isEditMode && networkSelection.isAnyUsbTether) {
+                liveOptions.firstOrNull {
+                    NetworkUtils.isLikelyUsbTetherInterface(it.selection.interfaceName) ||
+                        NetworkUtils.isLikelyEthernetInterface(it.selection.interfaceName)
+                }?.let { networkSelection = it.selection }
+            }
+
+            val updatedSelectedOption = liveOptions.firstOrNull { it.selection == networkSelection }
+            networkOptions = if (updatedSelectedOption == null) {
+                liveOptions + NetworkSelectionOption(
+                    selection = networkSelection,
+                    label = "${networkSelection.displayName} (unavailable)",
+                    address = null,
+                    isAvailable = false,
+                )
+            } else {
+                liveOptions
+            }
         }
     }
 
@@ -118,7 +167,7 @@ class StreamDetailViewModel @Inject constructor(
                 host = host.trim(),
                 port = port.toInt(),
                 netQuality = netQuality,
-                transportMode = transportMode,
+                networkSelection = networkSelection,
                 lowLatency = false,
                 sourceType = sourceType,
                 broadcastMode = broadcastMode,
@@ -128,5 +177,9 @@ class StreamDetailViewModel @Inject constructor(
             streamRepository.insertOrUpdate(stream)
             onSuccess()
         }
+    }
+
+    private companion object {
+        const val LEGACY_USB_TETHER_TRANSPORT = "USB_TETHER"
     }
 }

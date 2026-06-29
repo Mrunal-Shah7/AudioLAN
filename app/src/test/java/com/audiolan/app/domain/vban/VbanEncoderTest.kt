@@ -21,6 +21,11 @@ class VbanEncoderTest {
     }
 
     @Test
+    fun sampleRateByteEncodes44100AsOfficialIndex16() {
+        assertEquals(0x10.toByte(), packet(sampleRateHz = 44100)[4])
+    }
+
+    @Test
     fun numSamples128EncodesAs127() {
         assertEquals(127.toByte(), packet(numSamples = 128)[5])
     }

@@ -10,6 +10,7 @@ import com.audiolan.app.domain.model.ServiceState
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
+import com.audiolan.app.domain.model.StreamRuntimeStatus
 import com.audiolan.app.service.ServiceManager
 import com.audiolan.app.ui.components.StreamStatus
 import com.audiolan.app.util.NetworkUtils
@@ -21,7 +22,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,9 +61,6 @@ class HomeViewModel @Inject constructor(
     private val _isReceiverAccordionExpanded = MutableStateFlow(false)
     val isReceiverAccordionExpanded: StateFlow<Boolean> = _isReceiverAccordionExpanded.asStateFlow()
 
-    private val _transmitterActiveDelayElapsed = MutableStateFlow(false)
-    private val _receiverActiveDelayElapsed = MutableStateFlow(false)
-
     val transmitterStreams: StateFlow<List<Stream>> = streamRepository.getStreamsByType(ServiceType.TRANSMITTER)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -71,13 +68,21 @@ class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val transmitterStreamStatuses: StateFlow<Map<Long, StreamStatus>> =
-        combine(transmitterStreams, transmitterState, _transmitterActiveDelayElapsed) { streams, state, activeDelayElapsed ->
-            buildStreamStatuses(streams, state, activeDelayElapsed)
+        combine(
+            transmitterStreams,
+            transmitterState,
+            serviceManager.transmitterStreamStatuses,
+        ) { streams, state, runtimeStatuses ->
+            buildStreamStatuses(streams, state, runtimeStatuses)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val receiverStreamStatuses: StateFlow<Map<Long, StreamStatus>> =
-        combine(receiverStreams, receiverState, _receiverActiveDelayElapsed) { streams, state, activeDelayElapsed ->
-            buildStreamStatuses(streams, state, activeDelayElapsed)
+        combine(
+            receiverStreams,
+            receiverState,
+            serviceManager.receiverStreamStatuses,
+        ) { streams, state, runtimeStatuses ->
+            buildStreamStatuses(streams, state, runtimeStatuses)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _networkInterfaces = MutableStateFlow<List<NetworkInfo>>(emptyList())
@@ -89,22 +94,38 @@ class HomeViewModel @Inject constructor(
     private val _hasMicPermission = MutableStateFlow(false)
     val hasMicPermission: StateFlow<Boolean> = _hasMicPermission.asStateFlow()
 
+    private val _transmitterPanelError = MutableStateFlow<String?>(null)
+    val transmitterPanelError: StateFlow<String?> = _transmitterPanelError.asStateFlow()
+
+    private val _receiverPanelError = MutableStateFlow<String?>(null)
+    val receiverPanelError: StateFlow<String?> = _receiverPanelError.asStateFlow()
+
     val snackbarHostState = SnackbarHostState()
 
     init {
         refreshNetworkInterfaces()
         viewModelScope.launch {
-            merge(transmitterState, receiverState).collect { state ->
-                if (state is ServiceState.Error) {
-                    snackbarHostState.showSnackbar(
-                        message = state.message,
-                        duration = SnackbarDuration.Long,
-                    )
-                }
+            transmitterState.collect { state -> handleServiceState(ServiceType.TRANSMITTER, state) }
+        }
+        viewModelScope.launch {
+            receiverState.collect { state -> handleServiceState(ServiceType.RECEIVER, state) }
+        }
+        viewModelScope.launch {
+            transmitterStreams.collect { streams -> clearResolvedPanelError(ServiceType.TRANSMITTER, streams) }
+        }
+        viewModelScope.launch {
+            receiverStreams.collect { streams -> clearResolvedPanelError(ServiceType.RECEIVER, streams) }
+        }
+        viewModelScope.launch {
+            serviceManager.transmitterStreamStatuses.collect { statuses ->
+                handleRuntimeStatusErrors(ServiceType.TRANSMITTER, statuses)
             }
         }
-        observeServiceDelay(transmitterState, _transmitterActiveDelayElapsed)
-        observeServiceDelay(receiverState, _receiverActiveDelayElapsed)
+        viewModelScope.launch {
+            serviceManager.receiverStreamStatuses.collect { statuses ->
+                handleRuntimeStatusErrors(ServiceType.RECEIVER, statuses)
+            }
+        }
     }
 
     fun refreshNetworkInterfaces() {
@@ -133,6 +154,7 @@ class HomeViewModel @Inject constructor(
 
     fun onMicPermissionDenied() {
         _hasMicPermission.value = false
+        setPanelError(ServiceType.TRANSMITTER, "Microphone permission denied")
         Timber.w("RECORD_AUDIO permission denied by user")
     }
 
@@ -157,9 +179,10 @@ class HomeViewModel @Inject constructor(
         hasInternalAudioStreams: Boolean = resultCode != null && data != null,
     ) {
         if (!hasMicStreams && !hasInternalAudioStreams) {
-            showNoTransmitterStreamsMessage()
+            setNoEnabledStreamsError(ServiceType.TRANSMITTER)
             return
         }
+        clearPanelError(ServiceType.TRANSMITTER)
         serviceManager.startTransmitterService(
             resultCode = resultCode,
             data = data,
@@ -172,13 +195,19 @@ class HomeViewModel @Inject constructor(
 
     fun startReceiver() {
         viewModelScope.launch {
-            val duplicateNames = withContext(Dispatchers.IO) {
-                duplicateStreamNames(streamRepository.getEnabledStreamsByType(ServiceType.RECEIVER))
+            val enabledStreams = withContext(Dispatchers.IO) {
+                streamRepository.getEnabledStreamsByType(ServiceType.RECEIVER)
             }
-            if (duplicateNames.isNotEmpty()) {
-                showDuplicateStreamNamesMessage(ServiceType.RECEIVER, duplicateNames)
+            if (enabledStreams.isEmpty()) {
+                setNoEnabledStreamsError(ServiceType.RECEIVER)
                 return@launch
             }
+            val duplicateNames = duplicateStreamNames(enabledStreams)
+            if (duplicateNames.isNotEmpty()) {
+                setDuplicateStreamNamesError(ServiceType.RECEIVER, duplicateNames)
+                return@launch
+            }
+            clearPanelError(ServiceType.RECEIVER)
             serviceManager.startReceiverService()
         }
     }
@@ -186,15 +215,16 @@ class HomeViewModel @Inject constructor(
     fun stopReceiver() = serviceManager.stopReceiverService()
 
     fun onTransmitterConsentDenied() {
+        setPanelError(ServiceType.TRANSMITTER, "Screen capture permission denied")
         Timber.d("Transmitter MediaProjection consent denied by user")
     }
 
     fun onNoTransmitterStreamsConfigured() {
-        showNoTransmitterStreamsMessage()
+        setNoEnabledStreamsError(ServiceType.TRANSMITTER)
     }
 
     fun onDuplicateTransmitterStreamNames(names: List<String>) {
-        showDuplicateStreamNamesMessage(ServiceType.TRANSMITTER, names)
+        setDuplicateStreamNamesError(ServiceType.TRANSMITTER, names)
     }
 
     fun toggleTransmitterAccordion() {
@@ -205,31 +235,16 @@ class HomeViewModel @Inject constructor(
         _isReceiverAccordionExpanded.value = !_isReceiverAccordionExpanded.value
     }
 
-    private fun observeServiceDelay(
-        stateFlow: StateFlow<ServiceState>,
-        target: MutableStateFlow<Boolean>,
-    ) {
-        viewModelScope.launch {
-            stateFlow.collect { state ->
-                if (state is ServiceState.Running) {
-                    target.value = false
-                    kotlinx.coroutines.delay(ACTIVE_STATUS_DELAY_MS)
-                    if (stateFlow.value is ServiceState.Running) {
-                        target.value = true
-                    }
-                } else {
-                    target.value = false
-                }
-            }
-        }
-    }
-
     private fun buildStreamStatuses(
         streams: List<Stream>,
         serviceState: ServiceState,
-        activeDelayElapsed: Boolean,
+        runtimeStatuses: Map<Long, StreamRuntimeStatus>,
     ): Map<Long, StreamStatus> {
         if (serviceState is ServiceState.Error) {
+            val runtimeErrors = runtimeStatuses
+                .filterValues { it is StreamRuntimeStatus.Error }
+                .mapValues { (_, status) -> (status as StreamRuntimeStatus.Error).toUiStatus() }
+            if (runtimeErrors.isNotEmpty()) return runtimeErrors
             return streams
                 .filter { it.isEnabled }
                 .associate { it.id to StreamStatus.Error(serviceState.message) }
@@ -237,26 +252,127 @@ class HomeViewModel @Inject constructor(
         if (serviceState !is ServiceState.Running) return emptyMap()
         return streams
             .filter { it.isEnabled }
-            .associate { stream ->
-                stream.id to if (activeDelayElapsed) StreamStatus.Active else StreamStatus.Connecting
+            .mapNotNull { stream ->
+                val runtimeStatus = runtimeStatuses[stream.id] ?: return@mapNotNull null
+                stream.id to runtimeStatus.toUiStatus()
             }
+            .toMap()
     }
 
-    private fun showNoTransmitterStreamsMessage() {
+    private fun StreamRuntimeStatus.toUiStatus(): StreamStatus =
+        when (this) {
+            StreamRuntimeStatus.Connecting -> StreamStatus.Connecting
+            StreamRuntimeStatus.Active -> StreamStatus.Active
+            is StreamRuntimeStatus.Error -> StreamStatus.Error(message)
+        }
+
+    private fun handleServiceState(serviceType: ServiceType, state: ServiceState) {
+        when (state) {
+            is ServiceState.Error -> {
+                if (isPersistentPanelError(state.message)) {
+                    setPanelError(serviceType, state.message)
+                } else {
+                    clearPanelError(serviceType)
+                    showTransientError(state.message)
+                }
+            }
+            ServiceState.Starting,
+            ServiceState.Running,
+                -> clearPanelError(serviceType)
+            ServiceState.Idle,
+            ServiceState.Stopping,
+                -> Unit
+        }
+    }
+
+    private fun showTransientError(message: String) {
         viewModelScope.launch {
             snackbarHostState.showSnackbar(
-                message = "No enabled transmitter streams configured",
+                message = message,
                 duration = SnackbarDuration.Long,
             )
         }
     }
 
-    private fun showDuplicateStreamNamesMessage(serviceType: ServiceType, names: List<String>) {
-        viewModelScope.launch {
-            snackbarHostState.showSnackbar(
-                message = "Duplicate ${serviceType.name.lowercase()} stream name: ${names.joinToString()}",
-                duration = SnackbarDuration.Long,
-            )
+    private fun setNoEnabledStreamsError(serviceType: ServiceType) {
+        setPanelError(serviceType, "No enabled ${serviceType.name.lowercase()} streams configured")
+    }
+
+    private fun setDuplicateStreamNamesError(serviceType: ServiceType, names: List<String>) {
+        setPanelError(serviceType, "Duplicate ${serviceType.name.lowercase()} stream name: ${names.joinToString()}")
+    }
+
+    private fun setPanelError(serviceType: ServiceType, message: String) {
+        when (serviceType) {
+            ServiceType.TRANSMITTER -> _transmitterPanelError.value = message
+            ServiceType.RECEIVER -> _receiverPanelError.value = message
+        }
+    }
+
+    private fun clearPanelError(serviceType: ServiceType) {
+        when (serviceType) {
+            ServiceType.TRANSMITTER -> _transmitterPanelError.value = null
+            ServiceType.RECEIVER -> _receiverPanelError.value = null
+        }
+    }
+
+    private fun getPanelError(serviceType: ServiceType): String? =
+        when (serviceType) {
+            ServiceType.TRANSMITTER -> _transmitterPanelError.value
+            ServiceType.RECEIVER -> _receiverPanelError.value
+        }
+
+    private fun clearResolvedPanelError(serviceType: ServiceType, streams: List<Stream>) {
+        val current = when (serviceType) {
+            ServiceType.TRANSMITTER -> _transmitterPanelError.value
+            ServiceType.RECEIVER -> _receiverPanelError.value
+        } ?: return
+        val enabledStreams = streams.filter { it.isEnabled }
+        val shouldClear = when {
+            current.startsWith("No enabled", ignoreCase = true) -> enabledStreams.isNotEmpty()
+            current.startsWith("Duplicate", ignoreCase = true) -> duplicateStreamNames(enabledStreams).isEmpty()
+            else -> false
+        }
+        if (shouldClear) {
+            clearPanelError(serviceType)
+        }
+    }
+
+    private fun isPersistentPanelError(message: String): Boolean {
+        val normalized = message.lowercase()
+        return listOf(
+            "no enabled",
+            "duplicate",
+            "mediaprojection",
+            "screen capture",
+            "permission",
+            "port",
+            "in use",
+            "init failed",
+            "initialise",
+            "initialize",
+            "audiorecord",
+            "capture failed",
+            "revoked",
+            "unsupported",
+            "usb tethered",
+            "selected network",
+        ).any { token -> token in normalized }
+    }
+
+    private fun handleRuntimeStatusErrors(
+        serviceType: ServiceType,
+        statuses: Map<Long, StreamRuntimeStatus>,
+    ) {
+        val message = statuses.values
+            .filterIsInstance<StreamRuntimeStatus.Error>()
+            .firstOrNull()
+            ?.message
+        val current = getPanelError(serviceType)
+        if (message != null && isPersistentPanelError(message)) {
+            setPanelError(serviceType, message)
+        } else if (current?.startsWith("Selected network", ignoreCase = true) == true) {
+            clearPanelError(serviceType)
         }
     }
 
@@ -268,7 +384,4 @@ class HomeViewModel @Inject constructor(
             .values
             .mapNotNull { duplicates -> duplicates.firstOrNull()?.name }
 
-    private companion object {
-        const val ACTIVE_STATUS_DELAY_MS = 2_000L
-    }
 }

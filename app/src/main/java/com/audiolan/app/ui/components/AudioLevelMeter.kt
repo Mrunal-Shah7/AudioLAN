@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -34,12 +35,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.StatusError
-import com.audiolan.app.ui.theme.StatusSuccess
-import com.audiolan.app.ui.theme.StatusWarning
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import com.audiolan.app.util.AnimationUtils
+import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -63,11 +60,49 @@ fun AudioLevelMeter(
     val rawLevel = latestProvider()
 
     LaunchedEffect(animationsEnabled, isRunning) {
+        if (!animationsEnabled) {
+            while (isActive) {
+                val (leftTarget, rightTarget) = latestProvider()
+                updateMeterFrame(
+                    level = leftLevel,
+                    peak = leftPeak,
+                    target = if (isRunning) leftTarget else 0f,
+                    animationsEnabled = false,
+                    deltaMs = LEVEL_POLL_MS.toFloat(),
+                )
+                updateMeterFrame(
+                    level = rightLevel,
+                    peak = rightPeak,
+                    target = if (isRunning) rightTarget else 0f,
+                    animationsEnabled = false,
+                    deltaMs = LEVEL_POLL_MS.toFloat(),
+                )
+                delay(LEVEL_POLL_MS)
+            }
+            return@LaunchedEffect
+        }
+
+        var previousFrameNanos = withFrameNanos { it }
         while (isActive) {
+            val frameNanos = withFrameNanos { it }
+            val deltaMs = ((frameNanos - previousFrameNanos) / NANOS_PER_MS).coerceIn(0L, MAX_FRAME_DELTA_MS)
+                .toFloat()
+            previousFrameNanos = frameNanos
             val (leftTarget, rightTarget) = latestProvider()
-            updateMeterLevel(leftLevel, leftPeak, leftTarget.coerceIn(0f, 1f), animationsEnabled)
-            updateMeterLevel(rightLevel, rightPeak, rightTarget.coerceIn(0f, 1f), animationsEnabled)
-            delay(LEVEL_POLL_MS)
+            updateMeterFrame(
+                level = leftLevel,
+                peak = leftPeak,
+                target = if (isRunning) leftTarget else 0f,
+                animationsEnabled = true,
+                deltaMs = deltaMs,
+            )
+            updateMeterFrame(
+                level = rightLevel,
+                peak = rightPeak,
+                target = if (isRunning) rightTarget else 0f,
+                animationsEnabled = true,
+                deltaMs = deltaMs,
+            )
         }
     }
 
@@ -81,7 +116,7 @@ fun AudioLevelMeter(
         if (label.isNotBlank()) {
             Text(
                 text = label,
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelLarge,
             )
             Spacer(Modifier.height(Dimensions.SpaceXS))
@@ -122,16 +157,47 @@ fun CompactAudioLevelMeter(
     label: String,
     modifier: Modifier = Modifier,
 ) {
-    val level = levelProvider().first.coerceIn(0f, 1f)
+    val latestProvider by rememberUpdatedState(levelProvider)
+    val context = LocalContext.current
+    val animationsEnabled = AnimationUtils.isSystemAnimationEnabled(context) && !LocalInspectionMode.current
+    val initial = latestProvider().first.coerceIn(0f, 1f)
+    val displayedLevel = remember { Animatable(initial) }
+    val rawLevel = latestProvider().first.coerceIn(0f, 1f)
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val successColor = MaterialTheme.colorScheme.tertiary
+    val warningColor = MaterialTheme.colorScheme.secondary
+    val errorColor = MaterialTheme.colorScheme.error
+
+    LaunchedEffect(animationsEnabled) {
+        if (!animationsEnabled) {
+            while (isActive) {
+                displayedLevel.snapTo(latestProvider().first.coerceIn(0f, 1f))
+                delay(LEVEL_POLL_MS)
+            }
+            return@LaunchedEffect
+        }
+        var previousFrameNanos = withFrameNanos { it }
+        while (isActive) {
+            val frameNanos = withFrameNanos { it }
+            val deltaMs = ((frameNanos - previousFrameNanos) / NANOS_PER_MS).coerceIn(0L, MAX_FRAME_DELTA_MS)
+                .toFloat()
+            previousFrameNanos = frameNanos
+            val target = latestProvider().first.coerceIn(0f, 1f)
+            val current = displayedLevel.value
+            val timeConstant = if (target > current) ATTACK_TIME_MS else RELEASE_TIME_MS
+            displayedLevel.snapTo(current + (target - current) * smoothingAlpha(deltaMs, timeConstant))
+        }
+    }
+
     Row(
         modifier = modifier.semantics {
-            contentDescription = "$label level ${(level * 100).roundToInt()} percent"
+            contentDescription = "$label level ${(rawLevel * 100).roundToInt()} percent"
         },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.width(Dimensions.SpaceXS))
@@ -140,16 +206,17 @@ fun CompactAudioLevelMeter(
                 .weight(1f)
                 .height(6.dp),
         ) {
+            val level = displayedLevel.value.coerceIn(0f, 1f)
             drawRoundRect(
-                color = TextSecondary.copy(alpha = 0.18f),
+                color = trackColor,
                 cornerRadius = CornerRadius(size.height / 2, size.height / 2),
             )
             clipRect(right = size.width * level) {
                 drawRoundRect(
                     color = when {
-                        level >= 0.8f -> StatusError
-                        level >= 0.6f -> StatusWarning
-                        else -> StatusSuccess
+                        level >= 0.8f -> errorColor
+                        level >= 0.6f -> warningColor
+                        else -> successColor
                     },
                     cornerRadius = CornerRadius(size.height / 2, size.height / 2),
                 )
@@ -169,6 +236,12 @@ private fun MeterBar(
     modifier: Modifier = Modifier,
 ) {
     val pulse = remember { Animatable(0f) }
+    val zones = listOf(
+        Zone(0f, 0.6f, MaterialTheme.colorScheme.tertiary),
+        Zone(0.6f, 0.8f, MaterialTheme.colorScheme.secondary),
+        Zone(0.8f, 1f, MaterialTheme.colorScheme.error),
+    )
+    val peakColor = MaterialTheme.colorScheme.onSurface
     LaunchedEffect(isIdlePulseEnabled, animationsEnabled) {
         if (!isIdlePulseEnabled || !animationsEnabled) {
             pulse.snapTo(0f)
@@ -190,52 +263,58 @@ private fun MeterBar(
                 .height(barHeight),
         ) {
             val level = maxOf(levelProvider(), pulse.value).coerceIn(0f, 1f)
-            drawMeterTrack(level = level, peak = peakProvider().coerceIn(0f, 1f))
+            drawMeterTrack(
+                level = level,
+                peak = peakProvider().coerceIn(0f, 1f),
+                zones = zones,
+                peakColor = peakColor,
+            )
         }
         Spacer(Modifier.height(Dimensions.SpaceXXS))
         Text(
             text = channelLabel,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
     }
 }
 
-private suspend fun updateMeterLevel(
+private suspend fun updateMeterFrame(
     level: Animatable<Float, *>,
     peak: Animatable<Float, *>,
     target: Float,
     animationsEnabled: Boolean,
+    deltaMs: Float,
 ) {
-    if (animationsEnabled) {
-        level.animateTo(
-            target,
-            animationSpec = spring(
-                dampingRatio = 0.7f,
-                stiffness = Spring.StiffnessHigh,
-            ),
-        )
-    } else {
-        level.snapTo(target)
+    val clampedTarget = target.coerceIn(0f, 1f)
+    if (!animationsEnabled) {
+        level.snapTo(clampedTarget)
+        peak.snapTo(clampedTarget)
+        return
     }
 
-    if (target >= peak.value) {
-        peak.snapTo(target)
-    } else if (animationsEnabled) {
-        peak.snapTo((peak.value - PEAK_DECAY_PER_POLL).coerceAtLeast(target))
+    val current = level.value
+    val timeConstant = if (clampedTarget > current) ATTACK_TIME_MS else RELEASE_TIME_MS
+    level.snapTo(current + (clampedTarget - current) * smoothingAlpha(deltaMs, timeConstant))
+
+    if (clampedTarget >= peak.value) {
+        peak.snapTo(clampedTarget)
     } else {
-        peak.snapTo(target)
+        peak.snapTo((peak.value - deltaMs / PEAK_HOLD_RELEASE_MS).coerceAtLeast(clampedTarget))
     }
 }
 
-private fun DrawScope.drawMeterTrack(level: Float, peak: Float) {
+private fun smoothingAlpha(deltaMs: Float, timeConstantMs: Float): Float =
+    (1f - exp((-deltaMs / timeConstantMs).toDouble()).toFloat()).coerceIn(0f, 1f)
+
+private fun DrawScope.drawMeterTrack(
+    level: Float,
+    peak: Float,
+    zones: List<Zone>,
+    peakColor: Color,
+) {
     val zoneGap = 2.dp.toPx()
     val width = size.width
-    val zones = listOf(
-        Zone(0f, 0.6f, StatusSuccess),
-        Zone(0.6f, 0.8f, StatusWarning),
-        Zone(0.8f, 1f, StatusError),
-    )
     zones.forEach { zone ->
         val top = size.height * (1f - zone.end)
         val bottom = size.height * (1f - zone.start)
@@ -259,7 +338,7 @@ private fun DrawScope.drawMeterTrack(level: Float, peak: Float) {
     }
     val peakY = size.height * (1f - peak)
     drawLine(
-        color = TextPrimary,
+        color = peakColor,
         start = Offset(0f, peakY),
         end = Offset(width, peakY),
         strokeWidth = 1.dp.toPx(),
@@ -273,4 +352,8 @@ private data class Zone(
 )
 
 private const val LEVEL_POLL_MS = 50L
-private const val PEAK_DECAY_PER_POLL = 0.025f
+private const val NANOS_PER_MS = 1_000_000L
+private const val MAX_FRAME_DELTA_MS = 100L
+private const val ATTACK_TIME_MS = 45f
+private const val RELEASE_TIME_MS = 260f
+private const val PEAK_HOLD_RELEASE_MS = 2_000f

@@ -2,79 +2,60 @@ package com.audiolan.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Background and Surface
-val AppBackground: Color = Color(0xFF1A1A1A)
-val Surface: Color = Color(0xFF2A2A2A)
-val SurfaceFocused: Color = Color(0xFF353535)
+// Accent preset seeds. Complete Material 3 schemes are derived from these in Theme.kt.
+val LavenderSeed: Color = Color(0xFFC5B4F0)
+val TealSeed: Color = Color(0xFF80CBC4)
+val AmberSeed: Color = Color(0xFFFFCC80)
+val RoseSeed: Color = Color(0xFFF48FB1)
+val SkySeed: Color = Color(0xFF81D4FA)
+val BlueSeed: Color = Color(0xFF90CAF9)
+val GreenSeed: Color = Color(0xFFA5D6A7)
+val LimeSeed: Color = Color(0xFFDCE775)
+val OrangeSeed: Color = Color(0xFFFFAB91)
+val VioletSeed: Color = Color(0xFFCE93D8)
 
-// Primary Accent (Lavender)
-val LavenderPrimary: Color = Color(0xFFC5B4F0)
-val LavenderThumb: Color = Color(0xFF4B3D8F)
-val LavenderPressed: Color = Color(0xFFB0A0E0)
+internal val M3DarkBackground: Color = Color(0xFF131316)
+internal val M3DarkOnBackground: Color = Color(0xFFE6E1E5)
+internal val M3DarkSurface: Color = Color(0xFF131316)
+internal val M3DarkOnSurface: Color = Color(0xFFE6E1E5)
+internal val M3DarkSurfaceVariant: Color = Color(0xFF49454F)
+internal val M3DarkOnSurfaceVariant: Color = Color(0xFFCAC4D0)
+internal val M3DarkSurfaceDim: Color = Color(0xFF131316)
+internal val M3DarkSurfaceBright: Color = Color(0xFF39383C)
+internal val M3DarkSurfaceContainerLowest: Color = Color(0xFF0E0E11)
+internal val M3DarkSurfaceContainerLow: Color = Color(0xFF1D1B20)
+internal val M3DarkSurfaceContainer: Color = Color(0xFF211F26)
+internal val M3DarkSurfaceContainerHigh: Color = Color(0xFF2B2930)
+internal val M3DarkSurfaceContainerHighest: Color = Color(0xFF36343B)
+internal val M3DarkOutline: Color = Color(0xFF938F99)
+internal val M3DarkOutlineVariant: Color = Color(0xFF49454F)
+internal val M3DarkError: Color = Color(0xFFFFB4AB)
+internal val M3DarkOnError: Color = Color(0xFF690005)
+internal val M3DarkErrorContainer: Color = Color(0xFF93000A)
+internal val M3DarkOnErrorContainer: Color = Color(0xFFFFDAD6)
+internal val M3DarkInverseSurface: Color = Color(0xFFE6E1E5)
+internal val M3DarkInverseOnSurface: Color = Color(0xFF313033)
 
-val TealPrimary: Color = Color(0xFF80CBC4)
-val TealThumb: Color = Color(0xFF00695C)
-val TealPressed: Color = Color(0xFF4DB6AC)
+internal val M3LightBackground: Color = Color(0xFFFFFBFE)
+internal val M3LightOnBackground: Color = Color(0xFF1C1B1F)
+internal val M3LightSurface: Color = Color(0xFFFFFBFE)
+internal val M3LightOnSurface: Color = Color(0xFF1C1B1F)
+internal val M3LightSurfaceVariant: Color = Color(0xFFE7E0EC)
+internal val M3LightOnSurfaceVariant: Color = Color(0xFF49454F)
+internal val M3LightSurfaceDim: Color = Color(0xFFDED8E1)
+internal val M3LightSurfaceBright: Color = Color(0xFFFFFBFE)
+internal val M3LightSurfaceContainerLowest: Color = Color(0xFFFFFFFF)
+internal val M3LightSurfaceContainerLow: Color = Color(0xFFF7F2FA)
+internal val M3LightSurfaceContainer: Color = Color(0xFFF3EDF7)
+internal val M3LightSurfaceContainerHigh: Color = Color(0xFFECE6F0)
+internal val M3LightSurfaceContainerHighest: Color = Color(0xFFE6E0E9)
+internal val M3LightOutline: Color = Color(0xFF79747E)
+internal val M3LightOutlineVariant: Color = Color(0xFFCAC4D0)
+internal val M3LightError: Color = Color(0xFFBA1A1A)
+internal val M3LightOnError: Color = Color(0xFFFFFFFF)
+internal val M3LightErrorContainer: Color = Color(0xFFFFDAD6)
+internal val M3LightOnErrorContainer: Color = Color(0xFF410002)
+internal val M3LightInverseSurface: Color = Color(0xFF313033)
+internal val M3LightInverseOnSurface: Color = Color(0xFFF4EFF4)
 
-val AmberPrimary: Color = Color(0xFFFFCC80)
-val AmberThumb: Color = Color(0xFFE65100)
-val AmberPressed: Color = Color(0xFFFFB74D)
-
-val RosePrimary: Color = Color(0xFFF48FB1)
-val RoseThumb: Color = Color(0xFF880E4F)
-val RosePressed: Color = Color(0xFFEC407A)
-
-val SkyPrimary: Color = Color(0xFF81D4FA)
-val SkyThumb: Color = Color(0xFF01579B)
-val SkyPressed: Color = Color(0xFF4FC3F7)
-
-val BluePrimary: Color = Color(0xFF90CAF9)
-val BlueThumb: Color = Color(0xFF0D47A1)
-
-val GreenPrimary: Color = Color(0xFFA5D6A7)
-val GreenThumb: Color = Color(0xFF1B5E20)
-
-val LimePrimary: Color = Color(0xFFDCE775)
-val LimeThumb: Color = Color(0xFF827717)
-
-val OrangePrimary: Color = Color(0xFFFFAB91)
-val OrangeThumb: Color = Color(0xFFBF360C)
-
-val VioletPrimary: Color = Color(0xFFCE93D8)
-val VioletThumb: Color = Color(0xFF4A148C)
-
-val Primary: Color = LavenderPrimary
-val OnPrimary: Color = AppBackground
-val ToggleThumbActive: Color = LavenderThumb
-
-// Text
-val TextPrimary: Color = Color(0xFFFFFFFF)
-val TextSecondary: Color = Color(0xFF9E9E9E)
-val TextDisabled: Color = Color(0xFF5C5C5C)
-
-// Destructive (Salmon)
-val DeleteBackground: Color = Color(0xFFF4A4A4)
-val OnDelete: Color = Color(0xFF6B1A1A)
-val DeletePressed: Color = Color(0xFFE08888)
-
-// Neutral / Secondary Buttons
-val NeutralButton: Color = Color(0xFF3D3D3D)
-val NeutralButtonPressed: Color = Color(0xFF4A4A4A)
-val OnNeutralButton: Color = TextPrimary
-
-// Borders and Dividers
-val CardBorder: Color = Color(0xFF3A3A3A)
-val InputBorderDefault: Color = NeutralButtonPressed
-val InputBorderFocused: Color = LavenderPrimary
-val BottomNavBorder: Color = CardBorder
-
-// Status
-val StatusSuccess: Color = Color(0xFF4CAF50)
-val StatusError: Color = Color(0xFFCF6679)
-val StatusWarning: Color = Color(0xFFFFB74D)
-
-// Primary Pressed State
-val PrimaryPressed: Color = LavenderPressed
-
-// Dialog
-val DialogScrim: Color = Color(0x99000000)
+internal val M3Scrim: Color = Color(0xFF000000)

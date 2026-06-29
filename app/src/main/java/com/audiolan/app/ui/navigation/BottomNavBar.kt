@@ -1,6 +1,5 @@
 package com.audiolan.app.ui.navigation
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
@@ -8,10 +7,10 @@ import androidx.compose.material.icons.filled.CellTower
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsVoice
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
@@ -23,10 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.TextSecondary
-import androidx.compose.ui.graphics.Color
 
 @Stable
 private data class BottomNavItem(
@@ -47,57 +43,49 @@ fun BottomNavBar(
     navController: NavController,
     currentRoute: String?,
 ) {
-    Column {
-        HorizontalDivider(
-            thickness = Dimensions.BottomNavBorderWidth,
-            color = CardBorder,
-        )
-        NavigationBar(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .height(Dimensions.BottomNavHeight)
-                .testTag("bottom_navigation"),
-            containerColor = MaterialTheme.colorScheme.background,
-        ) {
-            bottomNavItems.forEach { item ->
-                val selected = currentRoute == item.route
-                val itemColor = if (selected) MaterialTheme.colorScheme.primary else TextSecondary
-                NavigationBarItem(
-                    modifier = Modifier.testTag("bottom_nav_${item.label}"),
-                    selected = selected,
-                    onClick = {
-                        navController.navigate(item.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
+    NavigationBar(
+        modifier = Modifier
+            .navigationBarsPadding()
+            .height(Dimensions.BottomNavHeight)
+            .testTag("bottom_navigation"),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = NavigationBarDefaults.Elevation,
+    ) {
+        bottomNavItems.forEach { item ->
+            val selected = currentRoute == item.route
+            NavigationBarItem(
+                modifier = Modifier.testTag("bottom_nav_${item.label}"),
+                selected = selected,
+                onClick = {
+                    navController.navigate(item.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
                         }
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = item.icon,
-                            contentDescription = item.label,
-                            tint = itemColor,
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = item.label,
-                            color = itemColor,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        indicatorColor = Color.Transparent,
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        unselectedIconColor = TextSecondary,
-                        unselectedTextColor = TextSecondary,
-                    ),
-                )
-            }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                icon = {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label,
+                    )
+                },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                    )
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                    selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            )
         }
     }
 }

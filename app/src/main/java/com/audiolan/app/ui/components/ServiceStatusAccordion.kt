@@ -9,7 +9,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
@@ -39,12 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.audiolan.app.domain.model.ServiceState
 import com.audiolan.app.domain.model.Stream
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.StatusSuccess
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import com.audiolan.app.util.AnimationUtils
 
 @Composable
@@ -86,9 +79,9 @@ fun ServiceStatusAccordion(
                     spring(stiffness = Spring.StiffnessHigh)
                 },
             ),
-        color = if (isRunning) AudioLANSurface else MaterialTheme.colorScheme.primary,
-        shape = RoundedCornerShape(Dimensions.CardCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = if (isRunning) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.primary,
+        contentColor = if (isRunning) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary,
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column {
             Row(
@@ -102,7 +95,7 @@ fun ServiceStatusAccordion(
             ) {
                 Text(
                     text = serviceButtonText(serviceLabel, serviceState),
-                    color = if (isRunning) StatusSuccess else MaterialTheme.colorScheme.onPrimary,
+                    color = if (isRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onPrimary,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f),
@@ -110,14 +103,14 @@ fun ServiceStatusAccordion(
                 if (isRunning) {
                     Text(
                         text = "$activeCount / $totalCount active",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     IconButton(onClick = onToggleExpand) {
                         Icon(
                             imageVector = Icons.Default.ExpandMore,
                             contentDescription = if (isExpanded) "collapse" else "expand",
-                            tint = TextSecondary,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.rotate(rotation),
                         )
                     }
@@ -143,7 +136,7 @@ fun ServiceStatusAccordion(
                     if (enabledStreams.isEmpty()) {
                         Text(
                             text = "no enabled streams",
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center,
@@ -175,7 +168,7 @@ private fun StreamStatusRow(
         Spacer(Modifier.width(Dimensions.SpaceS))
         Text(
             text = stream.name,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -184,7 +177,7 @@ private fun StreamStatusRow(
         Spacer(Modifier.width(Dimensions.SpaceS))
         Text(
             text = "${stream.host}:${stream.port}",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

@@ -5,8 +5,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contrast
@@ -45,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -58,13 +54,7 @@ import androidx.navigation.NavController
 import com.audiolan.app.domain.model.AccentColor
 import com.audiolan.app.ui.navigation.Screen
 import com.audiolan.app.ui.settings.components.AccentColorPickerSheet
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.LocalToggleThumbColor
-import com.audiolan.app.ui.theme.SurfaceFocused
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import com.audiolan.app.util.AnimationUtils
 
 @Composable
@@ -96,7 +86,7 @@ fun SettingsScreen(
             item(key = "title") {
                 Text(
                     text = "Settings",
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onBackground,
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = settingsItemModifier(animationsEnabled),
                 )
@@ -168,7 +158,7 @@ private fun SettingsNavRow(
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = TextSecondary,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp),
         )
     }
@@ -194,10 +184,11 @@ private fun SettingsToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = LocalToggleThumbColor.current,
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                 checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = TextSecondary,
-                uncheckedTrackColor = CardBorder,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
             ),
         )
     }
@@ -220,7 +211,7 @@ private fun AccentColorRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
@@ -228,7 +219,7 @@ private fun AccentColorRow(
             )
             Text(
                 text = selectedColor.displayName.replaceFirstChar { it.titlecase() },
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -249,22 +240,15 @@ private fun AccentColorRow(
 private fun SettingsCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    shape: Shape = RoundedCornerShape(Dimensions.CardCornerRadius),
     content: @Composable RowScope.() -> Unit,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            ),
-        color = if (pressed) SurfaceFocused else AudioLANSurface,
-        shape = shape,
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
     ) {
         Row(
             modifier = Modifier.padding(Dimensions.SpaceM),
@@ -277,13 +261,14 @@ private fun SettingsCard(
 @Composable
 private fun SettingsLeadingIcon(icon: ImageVector) {
     Surface(
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-        shape = RoundedCornerShape(Dimensions.RowCornerRadius),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = MaterialTheme.shapes.small,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier
                 .padding(Dimensions.SpaceXS)
                 .size(22.dp),
@@ -300,7 +285,7 @@ private fun SettingsText(
     Column(modifier = modifier) {
         Text(
             text = label,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -308,7 +293,7 @@ private fun SettingsText(
         )
         Text(
             text = subtitle,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -332,7 +317,7 @@ private fun AccentSwatch(
                 modifier = Modifier.size(18.dp),
                 shape = CircleShape,
                 color = Color.Transparent,
-                border = BorderStroke(2.dp, TextPrimary),
+                border = BorderStroke(Dimensions.CardBorderWidth, MaterialTheme.colorScheme.onSurface),
                 content = {},
             )
         }

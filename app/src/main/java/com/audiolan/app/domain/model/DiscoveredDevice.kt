@@ -11,4 +11,5 @@ data class DiscoveredDevice(
     val deviceName: String?,
     val streamName: String?,
     val source: DiscoverySource,
+    val originNetwork: NetworkSelection? = null,
 )

@@ -13,7 +13,7 @@ import com.audiolan.app.domain.model.ServiceState
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.Stream
 import com.audiolan.app.domain.model.StreamError
-import com.audiolan.app.domain.model.TransportMode
+import com.audiolan.app.domain.model.StreamRuntimeStatus
 import com.audiolan.app.service.ServiceEntryPoint
 import com.audiolan.app.util.NetworkUtils
 import com.audiolan.app.util.RetryUtils
@@ -21,6 +21,7 @@ import dagger.hilt.android.EntryPointAccessors
 import java.net.DatagramSocket
 import java.net.SocketException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +29,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import timber.log.Timber
 
 abstract class BaseStreamingService : Service() {
@@ -57,6 +59,7 @@ abstract class BaseStreamingService : Service() {
 
                 (currentIds - newIds).forEach { id ->
                     Timber.d("Stopping stream coroutine id=$id")
+                    serviceManager.clearStreamRuntimeStatus(serviceType(), id)
                     runningJobs.remove(id)?.cancel()
                     changed = true
                 }
@@ -64,7 +67,7 @@ abstract class BaseStreamingService : Service() {
                 (newIds - currentIds).forEach { id ->
                     val stream = enabledStreams.first { it.id == id }
                     Timber.d("Starting stream coroutine id=$id name=${stream.name}")
-                    runningJobs[id] = launchStreamJob(stream)
+                    launchStreamJob(stream)
                     changed = true
                 }
 
@@ -117,6 +120,7 @@ abstract class BaseStreamingService : Service() {
         serviceScope.launch {
             runningJobs.values.forEach { it.cancel() }
             runningJobs.clear()
+            serviceManager.clearStreamRuntimeStatuses(serviceType())
             updateServiceState(ServiceState.Error("Wi-Fi connection lost"))
             updateStreamCountNotification()
             stopSelf()
@@ -131,6 +135,7 @@ abstract class BaseStreamingService : Service() {
             val streams = streamRepository.getStreamsByType(serviceType()).first()
                 .filter { it.isEnabled && it.id in activeIds }
 
+            runningJobs.keys.forEach { id -> serviceManager.clearStreamRuntimeStatus(serviceType(), id) }
             runningJobs.values.forEach { it.cancel() }
             runningJobs.clear()
 
@@ -138,7 +143,7 @@ abstract class BaseStreamingService : Service() {
                 Timber.d(
                     "${this@BaseStreamingService::class.java.simpleName}: restarting stream ${stream.name} on Wi-Fi network $network",
                 )
-                runningJobs[stream.id] = launchStreamJob(stream)
+                launchStreamJob(stream)
             }
             updateStreamCountNotification()
         }
@@ -178,10 +183,31 @@ abstract class BaseStreamingService : Service() {
         wakeLock = null
     }
 
-    private fun launchStreamJob(stream: Stream): Job =
-        serviceScope.launch { retryLoop(stream) }
+    private fun launchStreamJob(stream: Stream) {
+        var completedWithError = false
+        val job = serviceScope.launch(start = CoroutineStart.LAZY) {
+            serviceManager.updateStreamRuntimeStatus(
+                serviceType = serviceType(),
+                streamId = stream.id,
+                status = StreamRuntimeStatus.Connecting,
+            )
+            try {
+                completedWithError = retryLoop(stream)
+            } finally {
+                if (runningJobs[stream.id] == coroutineContext[Job]) {
+                    runningJobs.remove(stream.id)
+                }
+                if (!completedWithError) {
+                    serviceManager.clearStreamRuntimeStatus(serviceType(), stream.id)
+                }
+                updateStreamCountNotification()
+            }
+        }
+        runningJobs[stream.id] = job
+        job.start()
+    }
 
-    private suspend fun retryLoop(stream: Stream) {
+    private suspend fun retryLoop(stream: Stream): Boolean {
         val maxAttempts = 3
         try {
             RetryUtils.withExponentialRetry(
@@ -195,17 +221,17 @@ abstract class BaseStreamingService : Service() {
             ) {
                 streamLoop(stream)
             }
+            return false
         } catch (e: CancellationException) {
             throw e
         } catch (e: SocketException) {
             Timber.e("Stream ${stream.name} failed after $maxAttempts attempts")
-            if (stream.transportMode == TransportMode.USB_TETHER) {
-                postStreamError(stream, "No USB tethered device connected")
-            } else {
-                postStreamError(stream, StreamError.NetworkUnreachable(stream.host, stream.port))
-            }
+            postStreamError(stream, StreamError.NetworkUnreachable(stream.host, stream.port))
+            return true
         } catch (e: Exception) {
             Timber.e(e, "Stream ${stream.name} unrecoverable error")
+            postStreamError(stream, e.message ?: "Stream failed")
+            return true
         }
     }
 
@@ -215,6 +241,11 @@ abstract class BaseStreamingService : Service() {
 
     protected open fun postStreamError(stream: Stream, message: String) {
         Timber.e("Stream error: ${stream.name} - $message")
+        serviceManager.updateStreamRuntimeStatus(
+            serviceType = serviceType(),
+            streamId = stream.id,
+            status = StreamRuntimeStatus.Error(message),
+        )
         updateServiceState(ServiceState.Error(message))
     }
 

@@ -18,7 +18,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.util.AnimationUtils
 import kotlin.math.PI
 import kotlin.math.sin
@@ -35,6 +34,7 @@ fun WaveProgressBar(
     val animationsEnabled = AnimationUtils.isSystemAnimationEnabled(context) && !LocalInspectionMode.current
     val density = LocalDensity.current
     val phase = remember { Animatable(0f) }
+    val inactiveColor = MaterialTheme.colorScheme.outlineVariant
 
     LaunchedEffect(isAnimating, animationsEnabled) {
         if (!isAnimating || !animationsEnabled) {
@@ -76,7 +76,7 @@ fun WaveProgressBar(
 
         if (progressX < size.width) {
             drawLine(
-                color = CardBorder,
+                color = inactiveColor,
                 start = Offset(progressX, centerY),
                 end = Offset(size.width, centerY),
                 strokeWidth = strokeWidth,

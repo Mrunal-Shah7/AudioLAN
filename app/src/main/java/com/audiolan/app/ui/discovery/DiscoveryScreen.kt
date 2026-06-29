@@ -1,6 +1,5 @@
 package com.audiolan.app.ui.discovery
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -40,6 +38,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.style.TextAlign
@@ -49,11 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.audiolan.app.domain.model.DiscoverySource
 import com.audiolan.app.service.discovery.PongResponder
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import com.audiolan.app.util.AnimationUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,7 +80,7 @@ fun DiscoveryScreen(
                 title = {
                     Text(
                         text = "discovery",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 },
@@ -94,7 +89,7 @@ fun DiscoveryScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "navigate back",
-                            tint = TextPrimary,
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 },
@@ -119,7 +114,7 @@ fun DiscoveryScreen(
                     disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
                     disabledContentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
-                shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+                shape = MaterialTheme.shapes.small,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = Dimensions.ButtonMinHeight),
@@ -136,13 +131,13 @@ fun DiscoveryScreen(
                         .fillMaxWidth()
                         .padding(vertical = Dimensions.SpaceXS),
                     color = MaterialTheme.colorScheme.primary,
-                    trackColor = CardBorder,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 )
             }
             error?.let { message ->
                 Text(
                     text = message,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(vertical = Dimensions.SpaceXS),
                 )
@@ -151,7 +146,7 @@ fun DiscoveryScreen(
             if (devices.isEmpty() && !isScanning) {
                 Text(
                     text = "no devices found. tap scan network to search.",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
@@ -186,18 +181,23 @@ fun DiscoveryScreen(
     duplicateMessage?.let { message ->
         AlertDialog(
             onDismissRequest = viewModel::dismissDuplicateMessage,
-            containerColor = AudioLANSurface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = MaterialTheme.shapes.large,
             title = {
                 Text(
-                    text = "receiver already configured",
-                    color = TextPrimary,
+                    text = if (message == SELF_ORIGINATED_STREAM_LABEL) {
+                        "stream cannot be saved"
+                    } else {
+                        "receiver already configured"
+                    },
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleMedium,
                 )
             },
             text = {
                 Text(
                     text = message,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             },
@@ -223,6 +223,11 @@ private fun DeviceResultCard(
     val hasPingPong = device.sources.contains(DiscoverySource.PING_PONG)
     val hasVban = device.sources.contains(DiscoverySource.VBAN_SNIFF)
     val hasUsb = device.sources.contains(DiscoverySource.USB_TETHER)
+    val isEnabled = !device.isSelfOriginated
+    val originNetworkText = device.originNetworks
+        .sortedBy { it.sortKey }
+        .joinToString(separator = ", ") { it.displayName }
+        .ifBlank { "unknown network" }
     val mainText = when {
         hasUsb -> "usb tether: ${device.deviceName ?: device.ip}"
         hasPingPong && !device.deviceName.isNullOrBlank() -> "${device.deviceName} @ ${device.ip}"
@@ -233,31 +238,49 @@ private fun DeviceResultCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.CardCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+            .alpha(if (isEnabled) 1f else DISABLED_CONTENT_ALPHA)
+            .clickable(
+                enabled = isEnabled,
+                onClick = onClick,
+            ),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.medium,
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.CardPadding),
         ) {
             Text(
                 text = mainText,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
             )
             if (hasVban && !device.streamName.isNullOrBlank()) {
                 Text(
                     text = "vban: ${device.streamName}",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = Dimensions.SpaceXXS),
+                )
+            }
+            Text(
+                text = "network: $originNetworkText",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = Dimensions.SpaceXXS),
+            )
+            if (device.isSelfOriginated) {
+                Text(
+                    text = SELF_ORIGINATED_STREAM_LABEL,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = Dimensions.SpaceXXS),
                 )
             }
             if (hasPingPong && hasVban) {
                 Text(
                     text = "ping/pong + vban",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = Dimensions.SpaceXXS),
                 )
@@ -273,3 +296,5 @@ private fun DeviceResultCard(
         }
     }
 }
+
+private const val DISABLED_CONTENT_ALPHA = 0.38f

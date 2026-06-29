@@ -13,15 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.NeutralButton
-import com.audiolan.app.ui.theme.OnNeutralButton
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import java.util.Locale
 
 @Composable
@@ -38,7 +32,7 @@ fun VolumeSliderRow(
     ) {
         Text(
             text = "vol",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(end = Dimensions.SpaceXS),
         )
@@ -52,23 +46,23 @@ fun VolumeSliderRow(
                     this.contentDescription = contentDescription
                 },
             colors = SliderDefaults.colors(
-                thumbColor = TextPrimary,
+                thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = CardBorder,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ),
         )
         Text(
             text = "x${String.format(Locale.US, "%.2f", volume)}",
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = Dimensions.SpaceXS),
         )
         Button(
             onClick = onReset,
-            shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+            shape = MaterialTheme.shapes.small,
             colors = ButtonDefaults.buttonColors(
-                containerColor = NeutralButton,
-                contentColor = OnNeutralButton,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             ),
             contentPadding = PaddingValues(
                 horizontal = Dimensions.ResetButtonHorizPadding,

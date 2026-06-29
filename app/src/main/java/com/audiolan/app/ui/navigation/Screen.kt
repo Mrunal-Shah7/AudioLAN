@@ -12,23 +12,23 @@ sealed class Screen(val route: String) {
     data object StreamDetail :
         Screen(
             "stream_detail?streamId={streamId}&host={host}&streamName={streamName}" +
-                "&transportMode={transportMode}&lowLatency={lowLatency}",
+                "&networkHint={networkHint}&lowLatency={lowLatency}",
         ) {
         const val ARG_STREAM_ID = "streamId"
         const val ARG_HOST = "host"
         const val ARG_STREAM_NAME = "streamName"
-        const val ARG_TRANSPORT_MODE = "transportMode"
+        const val ARG_NETWORK_HINT = "networkHint"
         const val ARG_LOW_LATENCY = "lowLatency"
 
         fun createRoute(
             streamId: Long = -1L,
             host: String = "",
             streamName: String = "",
-            transportMode: String = "",
+            networkHint: String = "",
             lowLatency: Boolean = false,
         ): String =
             "stream_detail?streamId=$streamId&host=${Uri.encode(host)}&streamName=${Uri.encode(streamName)}" +
-                "&transportMode=${Uri.encode(transportMode)}&lowLatency=$lowLatency"
+                "&networkHint=${Uri.encode(networkHint)}&lowLatency=$lowLatency"
 
         fun createRoute(): String = createRoute(streamId = -1L)
     }

@@ -7,7 +7,7 @@ data class Stream(
     val host: String,
     val port: Int,
     val netQuality: NetQuality,
-    val transportMode: TransportMode = TransportMode.WIFI,
+    val networkSelection: NetworkSelection = NetworkSelection.anyWifi(),
     val lowLatency: Boolean = false,
     val sourceType: SourceType = SourceType.MIC,
     val broadcastMode: Boolean = false,

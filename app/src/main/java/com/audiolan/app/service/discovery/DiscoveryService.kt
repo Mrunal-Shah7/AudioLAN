@@ -101,7 +101,6 @@ class DiscoveryService : Service() {
         return try {
             DatagramSocket(VBAN_PORT).apply {
                 soTimeout = SOCKET_TIMEOUT_MS
-                bindToWifiNetwork(this)
             }
         } catch (e: BindException) {
             Timber.w(e, "Discovery: could not bind port $VBAN_PORT - passive sniffing disabled")
@@ -114,22 +113,11 @@ class DiscoveryService : Service() {
             DatagramSocket(PING_PONG_PORT).apply {
                 soTimeout = SOCKET_TIMEOUT_MS
                 broadcast = true
-                bindToWifiNetwork(this)
             }
         } catch (e: BindException) {
             Timber.w(e, "Discovery: could not bind port $PING_PONG_PORT - ping/pong disabled")
             null
         }
-
-    private fun bindToWifiNetwork(socket: DatagramSocket) {
-        val network = NetworkUtils.getWifiNetwork(applicationContext) ?: return
-        runCatching {
-            network.bindSocket(socket)
-            Timber.d("Discovery: bound socket to Wi-Fi network $network")
-        }.onFailure { error ->
-            Timber.w(error, "Discovery: failed to bind socket to Wi-Fi network")
-        }
-    }
 
     private fun emitUsbTetherCandidates() {
         NetworkUtils.getUsbTetherPeerCandidates().forEach { ip ->
@@ -139,6 +127,7 @@ class DiscoveryService : Service() {
                     deviceName = "USB tether peer",
                     streamName = null,
                     source = DiscoverySource.USB_TETHER,
+                    originNetwork = originNetworkFor(ip),
                 ),
             )
             Timber.d("Discovery: USB tether peer candidate @ $ip")
@@ -187,6 +176,7 @@ class DiscoveryService : Service() {
                         deviceName = null,
                         streamName = result.first.streamName,
                         source = DiscoverySource.VBAN_SNIFF,
+                        originNetwork = originNetworkFor(packet.address),
                     ),
                 )
                 Timber.d("Discovery: VBAN sniff - ${result.first.streamName} @ $ip")
@@ -216,6 +206,7 @@ class DiscoveryService : Service() {
                             deviceName = deviceName,
                             streamName = null,
                             source = DiscoverySource.PING_PONG,
+                            originNetwork = originNetworkFor(packet.address),
                         ),
                     )
                     Timber.d("Discovery: pong from $deviceName @ $ip")
@@ -229,6 +220,14 @@ class DiscoveryService : Service() {
             }
         }
     }
+
+    private fun originNetworkFor(ip: String) =
+        runCatching { InetAddress.getByName(ip) }
+            .getOrNull()
+            ?.let(::originNetworkFor)
+
+    private fun originNetworkFor(address: InetAddress) =
+        NetworkUtils.resolveArrivalNetwork(applicationContext, address)?.selection
 
     override fun onDestroy() {
         serviceScope.cancel()

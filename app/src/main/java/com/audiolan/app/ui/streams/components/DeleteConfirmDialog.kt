@@ -1,16 +1,10 @@
 package com.audiolan.app.ui.streams.components
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import com.audiolan.app.ui.theme.DeleteBackground
-import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 
 @Composable
 fun DeleteConfirmDialog(
@@ -20,19 +14,19 @@ fun DeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.SpaceM),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.large,
         title = {
             Text(
                 text = "delete stream?",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
             )
         },
         text = {
             Text(
                 text = "\"$streamName\" will be permanently deleted. This action cannot be undone.",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
         },
@@ -40,7 +34,7 @@ fun DeleteConfirmDialog(
             TextButton(onClick = onConfirm) {
                 Text(
                     text = "delete",
-                    color = DeleteBackground,
+                    color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelLarge,
                 )
             }
@@ -49,7 +43,7 @@ fun DeleteConfirmDialog(
             TextButton(onClick = onDismiss) {
                 Text(
                     text = "cancel",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                 )
             }

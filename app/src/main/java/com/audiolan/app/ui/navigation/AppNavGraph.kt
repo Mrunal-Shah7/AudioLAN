@@ -80,7 +80,7 @@ fun AppNavGraph(
                     defaultValue = ""
                     nullable = false
                 },
-                navArgument(Screen.StreamDetail.ARG_TRANSPORT_MODE) {
+                navArgument(Screen.StreamDetail.ARG_NETWORK_HINT) {
                     type = NavType.StringType
                     defaultValue = ""
                     nullable = false
@@ -95,14 +95,14 @@ fun AppNavGraph(
             val streamId = backStackEntry.arguments?.getLong(Screen.StreamDetail.ARG_STREAM_ID) ?: -1L
             val host = backStackEntry.arguments?.getString(Screen.StreamDetail.ARG_HOST).orEmpty()
             val streamName = backStackEntry.arguments?.getString(Screen.StreamDetail.ARG_STREAM_NAME).orEmpty()
-            val transportMode = backStackEntry.arguments?.getString(Screen.StreamDetail.ARG_TRANSPORT_MODE).orEmpty()
+            val networkHint = backStackEntry.arguments?.getString(Screen.StreamDetail.ARG_NETWORK_HINT).orEmpty()
             val lowLatency = backStackEntry.arguments?.getBoolean(Screen.StreamDetail.ARG_LOW_LATENCY) ?: false
             StreamDetailScreen(
                 navController = navController,
                 streamId = streamId,
                 prefilledHost = host,
                 prefilledStreamName = streamName,
-                prefilledTransportMode = transportMode,
+                prefilledNetworkHint = networkHint,
                 prefilledLowLatency = lowLatency,
             )
         }

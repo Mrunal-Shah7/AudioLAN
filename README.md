@@ -117,8 +117,8 @@ app\build\outputs\bundle\release\app-release.aab
 Version values are defined in `app/build.gradle.kts`:
 
 ```kotlin
-versionCode = 1
-versionName = "Beta"
+versionCode = 100
+versionName = "1.0.0"
 ```
 
 For every published update, increase `versionCode`. Android requires `versionCode` to be an integer.

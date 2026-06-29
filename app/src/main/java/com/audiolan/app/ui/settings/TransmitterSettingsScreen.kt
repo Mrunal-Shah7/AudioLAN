@@ -1,6 +1,5 @@
 package com.audiolan.app.ui.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -44,11 +42,7 @@ import androidx.navigation.NavController
 import com.audiolan.app.ui.settings.components.OptionPickerDialog
 import com.audiolan.app.ui.settings.components.SettingsRow
 import com.audiolan.app.ui.streams.components.VolumeSliderRow
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.Surface as AudioLANSurface
-import com.audiolan.app.ui.theme.TextPrimary
-import com.audiolan.app.ui.theme.TextSecondary
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,7 +66,7 @@ fun TransmitterSettingsScreen(
                 title = {
                     Text(
                         text = "transmitter settings",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 },
@@ -81,13 +75,13 @@ fun TransmitterSettingsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "navigate back",
-                            tint = TextPrimary,
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
             )
@@ -112,7 +106,7 @@ fun TransmitterSettingsScreen(
             )
             Text(
                 text = "applies to microphone streams only",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(
                     start = Dimensions.RowHorizontalPadding,
@@ -209,9 +203,9 @@ private fun TransmitterVolumeCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AudioLANSurface,
-        shape = RoundedCornerShape(Dimensions.RowCornerRadius),
-        border = BorderStroke(Dimensions.CardBorderWidth, CardBorder),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = MaterialTheme.shapes.small,
     ) {
         Column(
             modifier = Modifier.padding(
@@ -221,13 +215,13 @@ private fun TransmitterVolumeCard(
         ) {
             Text(
                 text = "global volume",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 text = "(requires restart)",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(Dimensions.SpaceXS))
@@ -253,11 +247,12 @@ fun BufferSizeDialog(
     var value by remember(initialValue) { mutableStateOf(initialValue) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = AudioLANSurface,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.large,
         title = {
             Text(
                 text = title,
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium,
             )
         },
@@ -290,7 +285,7 @@ fun BufferSizeDialog(
             TextButton(onClick = onDismiss) {
                 Text(
                     text = "cancel",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                 )
             }

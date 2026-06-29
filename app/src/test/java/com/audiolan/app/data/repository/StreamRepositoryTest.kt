@@ -5,10 +5,10 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.audiolan.app.data.local.db.AppDatabase
 import com.audiolan.app.domain.model.NetQuality
+import com.audiolan.app.domain.model.NetworkSelection
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.SourceType
 import com.audiolan.app.domain.model.Stream
-import com.audiolan.app.domain.model.TransportMode
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -55,7 +55,7 @@ class StreamRepositoryTest {
         assertEquals("192.168.1.10", result.host)
         assertEquals(6980, result.port)
         assertEquals(NetQuality.OPTIMAL, result.netQuality)
-        assertEquals(TransportMode.WIFI, result.transportMode)
+        assertEquals(NetworkSelection.anyWifi(), result.networkSelection)
         assertEquals(false, result.lowLatency)
         assertEquals(SourceType.MIC, result.sourceType)
         assertEquals(false, result.broadcastMode)
@@ -189,7 +189,7 @@ class StreamRepositoryTest {
         host: String = "192.168.1.10",
         port: Int = 6980,
         netQuality: NetQuality = NetQuality.OPTIMAL,
-        transportMode: TransportMode = TransportMode.WIFI,
+        networkSelection: NetworkSelection = NetworkSelection.anyWifi(),
         lowLatency: Boolean = false,
         sourceType: SourceType = SourceType.MIC,
         broadcastMode: Boolean = false,
@@ -203,7 +203,7 @@ class StreamRepositoryTest {
             host = host,
             port = port,
             netQuality = netQuality,
-            transportMode = transportMode,
+            networkSelection = networkSelection,
             lowLatency = lowLatency,
             sourceType = sourceType,
             broadcastMode = broadcastMode,

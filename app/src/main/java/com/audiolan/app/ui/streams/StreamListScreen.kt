@@ -12,31 +12,38 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.SettingsEthernet
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -49,21 +56,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.audiolan.app.domain.model.NetworkSelection
 import com.audiolan.app.domain.model.ServiceState
 import com.audiolan.app.domain.model.ServiceType
 import com.audiolan.app.domain.model.Stream
-import com.audiolan.app.ui.components.AudioLevelMeter
 import com.audiolan.app.ui.navigation.Screen
 import com.audiolan.app.ui.streams.components.DeleteConfirmDialog
 import com.audiolan.app.ui.streams.components.StreamCard
-import com.audiolan.app.ui.theme.CardBorder
 import com.audiolan.app.ui.theme.Dimensions
-import com.audiolan.app.ui.theme.TextSecondary
 import com.audiolan.app.util.AnimationUtils
 import java.util.Locale
 
@@ -84,8 +90,9 @@ fun StreamListScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val serviceState by viewModel.serviceState.collectAsStateWithLifecycle()
-    val levelState by viewModel.levelState.collectAsStateWithLifecycle()
     val streamStatuses by viewModel.streamStatuses.collectAsStateWithLifecycle()
+    val groupByNetwork by viewModel.groupByNetwork.collectAsStateWithLifecycle()
+    val networkGroups by viewModel.networkGroups.collectAsStateWithLifecycle()
     var streamToDelete by remember { mutableStateOf<Stream?>(null) }
 
     LaunchedEffect(uiState.error) {
@@ -93,7 +100,7 @@ fun StreamListScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = viewModel.snackbarHostState) },
+        snackbarHost = { InsetAwareSnackbarHost(hostState = viewModel.snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
@@ -103,8 +110,27 @@ fun StreamListScreen(
                 },
                 colors = TopAppBarDefaults.mediumTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
+                actions = {
+                    IconButton(
+                        onClick = viewModel::toggleGroupByNetwork,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = if (groupByNetwork) {
+                                "group by network on"
+                            } else {
+                                "group by network off"
+                            },
+                            tint = if (groupByNetwork) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -141,49 +167,44 @@ fun StreamListScreen(
                     ) {
                         Text(
                             text = "no streams configured.\ntap + to add one.",
-                            color = TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
                         )
                     }
                 }
                 else -> {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        AnimatedVisibility(
-                            visible = serviceState is ServiceState.Running,
-                            enter = if (animationsEnabled) expandVertically() + fadeIn() else fadeIn(tween(0)),
-                            exit = if (animationsEnabled) shrinkVertically() + fadeOut() else fadeOut(tween(0)),
-                        ) {
-                            Column {
-                                AudioLevelMeter(
-                                    levelProvider = { levelState },
-                                    label = if (serviceType == ServiceType.TRANSMITTER) "output" else "input",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            horizontal = Dimensions.ScreenHorizontalPadding,
-                                            vertical = Dimensions.SpaceS,
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        verticalArrangement = Arrangement.spacedBy(Dimensions.CardSpacing),
+                        contentPadding = PaddingValues(
+                            start = Dimensions.ScreenHorizontalPadding,
+                            end = Dimensions.ScreenHorizontalPadding,
+                            top = Dimensions.ScreenVerticalPadding,
+                            bottom = Dimensions.SpaceHuge + Dimensions.FabOffset + Dimensions.ScreenVerticalPadding,
+                        ),
+                    ) {
+                        if (serviceType == ServiceType.RECEIVER) {
+                            item(key = "scan") {
+                                ReceiverScanButton(
+                                    onClick = { navController.navigate(Screen.Discovery.route) },
+                                    modifier = Modifier.animateItem(
+                                        placementSpec = spring(
+                                            dampingRatio = if (animationsEnabled) 0.75f else 1f,
+                                            stiffness = if (animationsEnabled) 200f else Spring.StiffnessHigh,
                                         ),
+                                    ),
                                 )
-                                HorizontalDivider(color = CardBorder)
+                                Spacer(Modifier.height(Dimensions.CardSpacing))
                             }
                         }
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .nestedScroll(scrollBehavior.nestedScrollConnection),
-                            verticalArrangement = Arrangement.spacedBy(Dimensions.CardSpacing),
-                            contentPadding = PaddingValues(
-                                start = Dimensions.ScreenHorizontalPadding,
-                                end = Dimensions.ScreenHorizontalPadding,
-                                top = Dimensions.ScreenVerticalPadding,
-                                bottom = Dimensions.SpaceHuge + Dimensions.FabOffset + Dimensions.ScreenVerticalPadding,
-                            ),
-                        ) {
-                            if (serviceType == ServiceType.RECEIVER) {
-                                item(key = "scan") {
-                                    ReceiverScanButton(
-                                        onClick = { navController.navigate(Screen.Discovery.route) },
+                        if (groupByNetwork) {
+                            networkGroups.forEach { group ->
+                                item(key = "network-header-${group.networkSelection.interfaceName}-${group.networkSelection.ssid}") {
+                                    NetworkSectionHeader(
+                                        networkSelection = group.networkSelection,
                                         modifier = Modifier.animateItem(
                                             placementSpec = spring(
                                                 dampingRatio = if (animationsEnabled) 0.75f else 1f,
@@ -191,44 +212,35 @@ fun StreamListScreen(
                                             ),
                                         ),
                                     )
-                                    Spacer(Modifier.height(Dimensions.CardSpacing))
                                 }
-                            }
-                            items(
-                                items = uiState.streams,
-                                key = { it.id },
-                            ) { stream ->
-                                AnimatedVisibility(
-                                    visible = true,
-                                    enter = if (animationsEnabled) {
-                                        fadeIn(tween(200)) + expandVertically()
-                                    } else {
-                                        fadeIn(tween(0))
+                                streamCardItems(
+                                    streams = group.streams,
+                                    serviceState = serviceState,
+                                    streamStatuses = streamStatuses,
+                                    animationsEnabled = animationsEnabled,
+                                    onToggle = viewModel::setEnabled,
+                                    onVolumeChange = viewModel::setVolume,
+                                    onResetVolume = { streamId -> viewModel.setVolume(streamId, 1.0f) },
+                                    onOpen = { stream ->
+                                        navController.navigate(Screen.StreamDetail.createRoute(stream.id))
                                     },
-                                    exit = if (animationsEnabled) {
-                                        fadeOut(tween(150)) + shrinkVertically()
-                                    } else {
-                                        fadeOut(tween(0))
-                                    },
-                                    modifier = Modifier.animateItem(
-                                        placementSpec = spring(
-                                            dampingRatio = if (animationsEnabled) 0.75f else 1f,
-                                            stiffness = if (animationsEnabled) 200f else Spring.StiffnessHigh,
-                                        ),
-                                    ),
-                                ) {
-                                    StreamCard(
-                                        stream = stream,
-                                        serviceState = serviceState,
-                                        status = streamStatuses[stream.id],
-                                        onToggle = { viewModel.setEnabled(stream.id, it) },
-                                        onVolumeChange = { viewModel.setVolume(stream.id, it) },
-                                        onResetVolume = { viewModel.setVolume(stream.id, 1.0f) },
-                                        onOpen = { navController.navigate(Screen.StreamDetail.createRoute(stream.id)) },
-                                        onDelete = { streamToDelete = stream },
-                                    )
-                                }
+                                    onDelete = { stream -> streamToDelete = stream },
+                                )
                             }
+                        } else {
+                            streamCardItems(
+                                streams = uiState.streams,
+                                serviceState = serviceState,
+                                streamStatuses = streamStatuses,
+                                animationsEnabled = animationsEnabled,
+                                onToggle = viewModel::setEnabled,
+                                onVolumeChange = viewModel::setVolume,
+                                onResetVolume = { streamId -> viewModel.setVolume(streamId, 1.0f) },
+                                onOpen = { stream ->
+                                    navController.navigate(Screen.StreamDetail.createRoute(stream.id))
+                                },
+                                onDelete = { stream -> streamToDelete = stream },
+                            )
                         }
                     }
                 }
@@ -236,8 +248,8 @@ fun StreamListScreen(
 
             FloatingActionButton(
                 onClick = { navController.navigate(Screen.StreamDetail.createRoute()) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 elevation = FloatingActionButtonDefaults.elevation(Dimensions.FabElevation),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -263,6 +275,116 @@ fun StreamListScreen(
     }
 }
 
+private fun androidx.compose.foundation.lazy.LazyListScope.streamCardItems(
+    streams: List<Stream>,
+    serviceState: ServiceState,
+    streamStatuses: Map<Long, com.audiolan.app.ui.components.StreamStatus>,
+    animationsEnabled: Boolean,
+    onToggle: (Long, Boolean) -> Unit,
+    onVolumeChange: (Long, Float) -> Unit,
+    onResetVolume: (Long) -> Unit,
+    onOpen: (Stream) -> Unit,
+    onDelete: (Stream) -> Unit,
+) {
+    items(
+        items = streams,
+        key = { it.id },
+    ) { stream ->
+        AnimatedVisibility(
+            visible = true,
+            enter = if (animationsEnabled) {
+                fadeIn(tween(200)) + expandVertically()
+            } else {
+                fadeIn(tween(0))
+            },
+            exit = if (animationsEnabled) {
+                fadeOut(tween(150)) + shrinkVertically()
+            } else {
+                fadeOut(tween(0))
+            },
+            modifier = Modifier.animateItem(
+                placementSpec = spring(
+                    dampingRatio = if (animationsEnabled) 0.75f else 1f,
+                    stiffness = if (animationsEnabled) 200f else Spring.StiffnessHigh,
+                ),
+            ),
+        ) {
+            StreamCard(
+                stream = stream,
+                serviceState = serviceState,
+                status = streamStatuses[stream.id],
+                onToggle = { onToggle(stream.id, it) },
+                onVolumeChange = { onVolumeChange(stream.id, it) },
+                onResetVolume = { onResetVolume(stream.id) },
+                onOpen = { onOpen(stream) },
+                onDelete = { onDelete(stream) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NetworkSectionHeader(
+    networkSelection: NetworkSelection,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = Dimensions.SpaceXS),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimensions.SpaceXS),
+    ) {
+        Icon(
+            imageVector = networkIcon(networkSelection),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = networkSelection.displayName,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+private fun networkIcon(networkSelection: NetworkSelection) =
+    if (
+        networkSelection.isAnyWifi ||
+        networkSelection.interfaceName.startsWith("wlan") ||
+        networkSelection.interfaceName.startsWith("wifi")
+    ) {
+        Icons.Default.Wifi
+    } else {
+        Icons.Default.SettingsEthernet
+    }
+
+@Composable
+private fun InsetAwareSnackbarHost(hostState: SnackbarHostState) {
+    val navBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Dimensions.ScreenHorizontalPadding)
+            .padding(bottom = Dimensions.BottomNavHeight + navBottomPadding + Dimensions.SpaceM),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        SnackbarHost(
+            hostState = hostState,
+            modifier = Modifier.fillMaxWidth(),
+            snackbar = { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    actionColor = MaterialTheme.colorScheme.primary,
+                )
+            },
+        )
+    }
+}
+
 @Composable
 private fun ReceiverScanButton(
     onClick: () -> Unit,
@@ -271,7 +393,7 @@ private fun ReceiverScanButton(
     Button(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Dimensions.ButtonCornerRadius),
+        shape = MaterialTheme.shapes.small,
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,

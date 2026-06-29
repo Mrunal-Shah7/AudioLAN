@@ -3,6 +3,8 @@ package com.audiolan.app.service
 import android.content.Context
 import android.content.Intent
 import com.audiolan.app.domain.model.ServiceState
+import com.audiolan.app.domain.model.ServiceType
+import com.audiolan.app.domain.model.StreamRuntimeStatus
 import com.audiolan.app.service.receiver.ReceiverService
 import com.audiolan.app.service.transmitter.TransmitterService
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,11 +22,19 @@ class ServiceManager @Inject constructor(
     private val _receiverState = MutableStateFlow<ServiceState>(ServiceState.Idle)
     private val _transmitterLevel = MutableStateFlow(0f to 0f)
     private val _receiverLevel = MutableStateFlow(0f to 0f)
+    private val _transmitterStreamStatuses =
+        MutableStateFlow<Map<Long, StreamRuntimeStatus>>(emptyMap())
+    private val _receiverStreamStatuses =
+        MutableStateFlow<Map<Long, StreamRuntimeStatus>>(emptyMap())
 
     val transmitterState: StateFlow<ServiceState> = _transmitterState.asStateFlow()
     val receiverState: StateFlow<ServiceState> = _receiverState.asStateFlow()
     val transmitterLevel: StateFlow<Pair<Float, Float>> = _transmitterLevel.asStateFlow()
     val receiverLevel: StateFlow<Pair<Float, Float>> = _receiverLevel.asStateFlow()
+    val transmitterStreamStatuses: StateFlow<Map<Long, StreamRuntimeStatus>> =
+        _transmitterStreamStatuses.asStateFlow()
+    val receiverStreamStatuses: StateFlow<Map<Long, StreamRuntimeStatus>> =
+        _receiverStreamStatuses.asStateFlow()
 
     fun updateTransmitterState(state: ServiceState) {
         _transmitterState.value = state
@@ -48,6 +58,26 @@ class ServiceManager @Inject constructor(
 
     fun clearReceiverLevel() {
         _receiverLevel.value = 0f to 0f
+    }
+
+    fun updateStreamRuntimeStatus(
+        serviceType: ServiceType,
+        streamId: Long,
+        status: StreamRuntimeStatus,
+    ) {
+        val flow = runtimeStatusFlow(serviceType)
+        flow.value = flow.value + (streamId to status)
+    }
+
+    fun clearStreamRuntimeStatus(serviceType: ServiceType, streamId: Long) {
+        val flow = runtimeStatusFlow(serviceType)
+        if (streamId in flow.value) {
+            flow.value = flow.value - streamId
+        }
+    }
+
+    fun clearStreamRuntimeStatuses(serviceType: ServiceType) {
+        runtimeStatusFlow(serviceType).value = emptyMap()
     }
 
     fun startTransmitterService(
@@ -86,6 +116,12 @@ class ServiceManager @Inject constructor(
         _receiverState.value = ServiceState.Stopping
         context.stopService(Intent(context, ReceiverService::class.java))
     }
+
+    private fun runtimeStatusFlow(serviceType: ServiceType): MutableStateFlow<Map<Long, StreamRuntimeStatus>> =
+        when (serviceType) {
+            ServiceType.TRANSMITTER -> _transmitterStreamStatuses
+            ServiceType.RECEIVER -> _receiverStreamStatuses
+        }
 
     companion object {
         const val TRANSMITTER_CHANNEL_ID = "transmitter_service"
